@@ -13,7 +13,8 @@
   const TILE = 32;
   const SAVE_KEY = "pixel-era-five-realms-v1";
   const BACKUP_SAVE_KEY = `${SAVE_KEY}-backup`;
-  const SAVE_FORMAT = 2;
+  const SLOT_SAVE_KEYS = [1,2,3].map(i => `${SAVE_KEY}-slot-${i}`);
+  const SAVE_FORMAT = 3;
   const SLOT_NAMES = { weapon: "武器", helmet: "头盔", armor: "铠甲", boots: "靴子", amulet: "饰品" };
   const WEAPON_TYPES = ["sword", "spear", "axe", "staff", "daggers"];
   const WEAPON_NAMES = { sword: "长剑", spear: "长枪", axe: "战斧", staff: "星杖", daggers: "双刃" };
@@ -40,7 +41,8 @@
     waste: "assets/sprites/waste-atlas.png", tundra: "assets/sprites/tundra-atlas.png",
     peaks: "assets/sprites/peaks-atlas.png", abyss: "assets/sprites/abyss-atlas.png",
     equipment: "assets/sprites/equipment-atlas.png", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas.png",
-    terrain: "assets/sprites/terrain-atlas.png"
+    terrain: "assets/sprites/terrain-atlas.png", heroDirectional: "assets/sprites/hero-directional-atlas.png?v=2",
+    eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas.png?v=2"
   };
   const ART = {};
   Object.entries(SPRITE_PATHS).forEach(([key, src]) => { const img = new Image(); img.src = src; ART[key] = img; });
@@ -229,8 +231,8 @@
   const game = {
     save: freshSave(), scene: "title", paused: true, world: null, biome: 0, depth: 1,
     keys: new Set(), mouse: { x: W / 2, y: H / 2 }, camera: { x: 0, y: 0 },
-    player: { x: 0, y: 0, vx: 0, vy: 0, dirX: 1, dirY: 0, radius: 12, invuln: 0, dash: 0, attackCd: 0, combo: 0, comboUntil: 0, swing: null },
-    enemies: [], particles: [], numbers: [], telegraphs: [], projectiles: [], impacts: [], resources: [], altars: [],
+    player: { x: 0, y: 0, vx: 0, vy: 0, dirX: 1, dirY: 0, aimAngle: 0, radius: 12, invuln: 0, dash: 0, attackCd: 0, combo: 0, comboUntil: 0, swing: null, running: false, runKey: null, runUntil: 0, lastTap: {}, recoveryPose: 0, activeCd1: 0, activeCd2: 0 },
+    enemies: [], particles: [], numbers: [], telegraphs: [], projectiles: [], impacts: [], resources: [], altars: [], groundDrops: [],
     screenShake: 0, hitStop: 0, lastTime: 0, autosave: 0, zoneTime: 0, hazardTimer: 2.5, unseenItems: 0,
     forgeTab: "craft", selectedForge: null, runLoot: { gold: 0, materials: 0, kills: 0 },
     audio: null
@@ -264,7 +266,7 @@
       critRate: .05 + statValue("critRate") + s.fury.weakness * .05,
       critDamage: 1.5 + statValue("critDamage"), attackSpeed: 1 + statValue("attackSpeed"),
       dodge: statValue("dodge"), reduction: clamp(statValue("reduction"), 0, .65),
-      moveSpeed: 155 * (1 + statValue("moveSpeed") + s.explore.haste * .05),
+      moveSpeed: 124 * (1 + statValue("moveSpeed") + s.explore.haste * .05),
       lifeSteal: statValue("lifeSteal")
     };
   }
@@ -335,7 +337,7 @@
       player: { x:game.player.x, y:game.player.y, dirX:game.player.dirX, dirY:game.player.dirY },
       world: { seed:game.world.seed, exitLocked:game.world.exitLocked, revealed:[...game.world.revealed] },
       enemies: game.enemies.filter(e=>!e.dead).map(e=>({name:e.name,color:e.color,speed:e.speed,hp:e.hp,maxHp:e.maxHp,damage:e.damage,typeIndex:e.typeIndex,elite:e.elite,x:e.x,y:e.y,homeX:e.homeX,homeY:e.homeY,radius:e.radius,boss:e.boss,attackCd:e.attackCd,specialCd:e.specialCd,phase:e.phase,pattern:e.pattern,statuses:e.statuses})),
-      resources: game.resources.map(r=>({...r})), altars: game.altars.map(a=>({...a}))
+      resources: game.resources.map(r=>({...r})), altars: game.altars.map(a=>({...a})), groundDrops:game.groundDrops.map(d=>({...d}))
     };
   }
 
@@ -361,6 +363,10 @@
     return null;
   }
 
+  function readSaveKey(key, source) {
+    try { return decodeSave(localStorage.getItem(key), source); } catch { return null; }
+  }
+
   function saveGame(silent = false) {
     try {
       const current=localStorage.getItem(SAVE_KEY);if(current){try{decodeSave(current);localStorage.setItem(BACKUP_SAVE_KEY,current);}catch{/* never replace a good backup with corrupt data */}}
@@ -373,6 +379,13 @@
       if (!silent) toast("存档失败：浏览器阻止了本地存储", "#ef6b6b");
       return false;
     }
+  }
+
+  function saveGameToSlot(index) {
+    if (game.scene === "title") return;
+    const key=SLOT_SAVE_KEYS[index];if(!key)return;
+    try { localStorage.setItem(key,encodeSave());toast(`已写入手动存档 ${index+1}`,"#9de7ff");playSfx("save");renderSavePanel();updateTitleSaveMeta(); }
+    catch { toast("手动存档失败：浏览器存储不可用","#ef6b6b"); }
   }
 
   function toast(text, color = "#e8d7b0") {
@@ -487,6 +500,17 @@
     playSfx("drop");
   }
 
+  function spawnGroundDrop(kind,x,y,data={}) {
+    const a=Math.random()*Math.PI*2,r=10+Math.random()*18;game.groundDrops.push({id:`drop-${Date.now()}-${Math.random()}`,kind,x:x+Math.cos(a)*r,y:y+Math.sin(a)*r,life:0,...data});playSfx("drop");
+  }
+
+  function pickupGroundDrop(drop) {
+    if(drop.kind==="equipment")addItem(drop.item);
+    else if(drop.kind==="potion"){if(game.save.player.potions>=8)return toast("药水袋已满（8 / 8）","#efc46d");game.save.player.potions++;toast("拾取生命药水 ×1","#8be89f");}
+    else if(drop.kind==="material"){game.save.materials[drop.material]=(game.save.materials[drop.material]||0)+(drop.amount||1);game.runLoot.materials+=drop.amount||1;toast(`拾取 ${MATERIAL_NAMES[drop.material]} ×${drop.amount||1}`,BIOMES[game.biome].accent);}
+    game.groundDrops=game.groundDrops.filter(d=>d!==drop);updateHUD();beep(520,.1,"triangle",.03);
+  }
+
   function itemMainValue(item) { return item.main.value + Math.ceil(item.main.value * item.enhance * .07); }
 
   function startNewGame() {
@@ -503,31 +527,35 @@
   }
 
   function continueGame() {
-    const loaded=readSavedGame();if(!loaded)return toast("没有找到可读取的存档","#ef7268");game.save=loaded.save;game.unseenItems=0;
+    openPanel("save-panel");
+  }
+
+  function loadDecodedGame(loaded) {
+    if(!loaded)return toast("这个档位为空或已损坏","#ef7268");game.save=loaded.save;game.unseenItems=0;
     if(loaded.session?.scene==="expedition")restoreSession(loaded.session);else enterCamp(false);
     if(loaded.source==="backup")toast("主存档异常，已从备份恢复","#ffd36b");else if(loaded.migrated)toast("旧版存档已迁移为新版格式","#9de7ff");else toast("星火回应了你的归来");
     saveGame(true);
   }
 
-  function updateTitleSaveMeta(){const meta=$("save-meta"),button=$("continue-btn");if(!meta||!button)return;const loaded=readSavedGame();button.disabled=!loaded;if(!loaded){meta.textContent="尚无存档";return;}const when=loaded.savedAt?new Date(loaded.savedAt).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"旧版存档";meta.textContent=`${loaded.session?.scene==="expedition"?`${BIOMES[loaded.session.biome]?.name||"远征"} · 深度 ${loaded.session.depth}`:"星火营地"} · ${when}${loaded.source==="backup"?" · 备份":""}`;}
+  function updateTitleSaveMeta(){const meta=$("save-meta"),button=$("continue-btn");if(!meta||!button)return;const loaded=readSavedGame()||SLOT_SAVE_KEYS.map((k,i)=>readSaveKey(k,`slot-${i+1}`)).find(Boolean);button.disabled=!loaded;if(!loaded){meta.textContent="尚无存档";return;}const when=loaded.savedAt?new Date(loaded.savedAt).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"旧版存档";meta.textContent=`${loaded.session?.scene==="expedition"?`${BIOMES[loaded.session.biome]?.name||"远征"} · 深度 ${loaded.session.depth}`:"星火营地"} · ${when} · 点击查看存档列表`;}
 
   function restoreSession(session){
     const biome=clamp(Number(session.biome)||0,0,4),depth=clamp(Number(session.depth)||1,1,5);game.biome=biome;game.depth=depth;game.scene="expedition";game.paused=false;game.zoneTime=0;game.runLoot=session.runLoot||{gold:0,materials:0,kills:0};
     game.world=generateMap(session.world?.seed||`${BIOMES[biome].id}-restored-${depth}`,biome,depth);game.world.exitLocked=session.world?.exitLocked??(depth===5);game.world.revealed=new Set(session.world?.revealed||[]);
     game.player.x=session.player?.x??((game.world.start.x+.5)*TILE);game.player.y=session.player?.y??((game.world.start.y+.5)*TILE);game.player.dirX=session.player?.dirX??1;game.player.dirY=session.player?.dirY??0;game.player.vx=game.player.vy=0;game.player.invuln=1.8;game.player.swing=null;game.player.statuses={};
     game.enemies=[];(session.enemies||[]).forEach(saved=>{spawnEnemy(saved.typeIndex||0,saved.x,saved.y,!!saved.boss);const e=game.enemies[game.enemies.length-1];Object.assign(e,saved,{attack:saved.boss?null:ENEMY_ATTACKS[biome][saved.typeIndex||0],state:"patrol",stateTime:0,vx:0,vy:0,dead:false,statuses:saved.statuses||{}});});
-    game.resources=(session.resources||[]).map(r=>({...r}));game.altars=(session.altars||[]).map(a=>({...a}));game.telegraphs=[];game.projectiles=[];game.impacts=[];game.particles=[];game.numbers=[];game.camera.x=game.camera.y=0;
+    game.resources=(session.resources||[]).map(r=>({...r}));game.altars=(session.altars||[]).map(a=>({...a}));game.groundDrops=(session.groundDrops||[]).map(d=>({...d}));game.telegraphs=[];game.projectiles=[];game.impacts=[];game.particles=[];game.numbers=[];game.camera.x=game.camera.y=0;
     $("title-screen").classList.add("hidden");$("death-panel").classList.add("hidden");$("hud").classList.remove("hidden");closeAllModals();setMusicTheme(BIOME_ART_KEYS[biome]);updateCamera(1);updateHUD();
   }
 
   function enterCamp(first = false) {
-    game.scene = "camp"; game.paused = false; game.world = null; game.enemies = []; game.resources = []; game.telegraphs = []; game.projectiles = []; game.impacts = []; game.altars = [];
+    game.scene = "camp"; game.paused = false; game.world = null; game.enemies = []; game.resources = []; game.telegraphs = []; game.projectiles = []; game.impacts = []; game.altars = []; game.groundDrops=[];
     const st = stats(); game.save.player.hp = st.maxHp; game.save.player.stamina = 100; game.save.player.potions = Math.max(3, game.save.player.potions);
     game.player.x = W / 2; game.player.y = H / 2 + 80; game.player.vx = game.player.vy = 0; game.camera.x = game.camera.y = 0;
     $("title-screen").classList.add("hidden"); $("death-panel").classList.add("hidden"); $("hud").classList.remove("hidden");
     setMusicTheme("camp");
     closeAllModals(); renderContinentPanel(); updateHUD(); saveGame(true);
-    if (first) setTimeout(() => openPanel("continent-panel"), 450);
+    if (first) toast("营地现在可以自由移动；靠近星门或按 M 选择远征大陆。","#9de7ff");
   }
 
   function generateMap(seed, biomeIndex, depth) {
@@ -588,7 +616,7 @@
     const w = game.world;
     game.player.x = (w.start.x + .5) * TILE; game.player.y = (w.start.y + .5) * TILE;
     game.player.vx = game.player.vy = 0; game.player.invuln = 2.2; game.player.swing = null;
-    game.enemies = []; game.resources = []; game.telegraphs = []; game.projectiles = []; game.impacts = []; game.altars = []; game.particles = []; game.numbers = [];
+    game.enemies = []; game.resources = []; game.telegraphs = []; game.projectiles = []; game.impacts = []; game.altars = []; game.particles = []; game.numbers = []; game.groundDrops=[];
     const rng = w.rng;
     const occupied = new Set();
     const cellKey = p => `${p.x},${p.y}`;
@@ -643,14 +671,16 @@
     else e.vy = 0;
   }
 
-  function spawnProjectile({ x, y, dx, dy, speed = 250, damage = 10, team = "enemy", effect = 5, radius = 9, life = 2.4, status = null, homing = 0, pierce = 0, owner = null }) {
+  function spawnProjectile({ x, y, dx, dy, speed = 250, damage = 10, team = "enemy", effect = 5, radius = 9, life = 2.4, status = null, homing = 0, pierce = 0, owner = null, monsterFx = null }) {
     const len = Math.hypot(dx, dy) || 1;
-    game.projectiles.push({ x, y, vx: dx / len * speed, vy: dy / len * speed, damage, team, effect, radius, life, status, homing, pierce, owner, spin: Math.random() * Math.PI * 2 });
+    game.projectiles.push({ x, y, vx: dx / len * speed, vy: dy / len * speed, damage, team, effect, radius, life, status, homing, pierce, owner, monsterFx, spin: Math.random() * Math.PI * 2 });
   }
 
   function spawnImpact(x, y, effect = 10, size = 46, life = .28) {
     game.impacts.push({ x, y, effect, size, life, max: life, rotation: Math.random() * Math.PI * 2 });
   }
+
+  function spawnMonsterFx(x,y,col,row,angle=0,size=82,life=.42) { game.impacts.push({x,y,monsterFx:{col,row},size,life,max:life,rotation:angle}); }
 
   function applyPlayerStatus(status, duration = 2.5) {
     if (!status) return;
@@ -683,6 +713,10 @@
 
   function playerWeaponProfile() { return WEAPON_PROFILES[equippedWeaponType()]; }
 
+  function setPlayerAim(dx,dy) {
+    const len=Math.hypot(dx,dy)||1;game.player.dirX=dx/len;game.player.dirY=dy/len;game.player.aimAngle=Math.atan2(game.player.dirY,game.player.dirX);
+  }
+
   function attack(fromKeyboard = false) {
     if (game.scene !== "expedition" || game.paused || isModalOpen() || game.player.attackCd > 0 || game.player.dash > 0) return;
     const p = game.player; const st = stats(); const now = performance.now() / 1000; const weaponType = equippedWeaponType(); const profile = WEAPON_PROFILES[weaponType];
@@ -692,12 +726,26 @@
       const wx = game.mouse.x + game.camera.x, wy = game.mouse.y + game.camera.y;
       const len = Math.hypot(wx - p.x, wy - p.y) || 1; dx = (wx - p.x) / len; dy = (wy - p.y) / len;
     }
-    p.dirX = dx; p.dirY = dy;
-    const duration = (p.combo === 3 ? .36 : .24) / profile.speed;
+    setPlayerAim(dx,dy);dx=p.dirX;dy=p.dirY;
+    const duration = (p.combo === 3 ? .44 : p.combo === 2 ? .29 : .24) / profile.speed;
     p.attackCd = duration / st.attackSpeed;
     p.swing = { t: duration, max: duration, combo: p.combo, dx, dy, hits: new Set(), weaponType, profile, fired: false };
-    if (weaponType === "spear" && p.combo === 3) { p.vx += dx * 105; p.vy += dy * 105; }
+    p.recoveryPose=0;
+    if (weaponType === "spear" && p.combo === 3) { p.vx += dx * 145; p.vy += dy * 145; }
+    if (weaponType === "daggers" && p.combo === 3) moveEntity(p,dx*24,dy*24,p.radius);
     playWeaponSfx(weaponType,p.combo);
+  }
+
+  function useActiveSkill(slot=1) {
+    if(game.scene!=="expedition"||game.paused||isModalOpen())return;const p=game.player,st=stats(),type=equippedWeaponType();
+    if(slot===2){if(p.activeCd2>0)return toast(`星爆术冷却 ${p.activeCd2.toFixed(1)} 秒`,"#d4b0ff");if(game.save.player.stamina<45)return toast("耐力不足","#e5cf69");game.save.player.stamina-=45;p.activeCd2=9;p.recoveryPose=.55;game.enemies.filter(e=>!e.dead&&dist(e,p)<165).forEach(e=>{const a=Math.atan2(e.y-p.y,e.x-p.x),crit=Math.random()<st.critRate;damageEnemy(e,st.attack*2.15*offensiveMultiplier(e)*(crit?st.critDamage:1),crit,Math.cos(a)*230,Math.sin(a)*230);});for(let i=0;i<12;i++){const a=i/12*Math.PI*2;spawnProjectile({x:p.x,y:p.y,dx:Math.cos(a),dy:Math.sin(a),speed:235,damage:st.attack*.65,team:"player",effect:9,radius:9,life:.75,pierce:1});}spawnImpact(p.x,p.y,9,175,.55);burst(p.x,p.y,"#e4a4ff",30,230);playWeaponSfx("staff",3);return;}
+    if(p.activeCd1>0)return toast(`武器战技冷却 ${p.activeCd1.toFixed(1)} 秒`,"#ffe09a");if(game.save.player.stamina<28)return toast("耐力不足","#e5cf69");game.save.player.stamina-=28;p.activeCd1=5.2;p.recoveryPose=.48;const dx=Math.cos(p.aimAngle),dy=Math.sin(p.aimAngle),hit=(e,mult,knock=180)=>{const crit=Math.random()<st.critRate;damageEnemy(e,st.attack*mult*offensiveMultiplier(e)*(crit?st.critDamage:1),crit,dx*knock,dy*knock);rollOffensiveAffixes(e);};
+    if(type==="staff"){for(let i=-2;i<=2;i++){const a=p.aimAngle+i*.18;spawnProjectile({x:p.x,y:p.y,dx:Math.cos(a),dy:Math.sin(a),speed:390,damage:st.attack*1.35,team:"player",effect:3,radius:12,pierce:2});}}
+    else if(type==="sword"){game.enemies.filter(e=>!e.dead&&dist(e,p)<105).forEach(e=>hit(e,1.8,250));spawnImpact(p.x,p.y,0,150,.42);}
+    else if(type==="axe"){game.enemies.filter(e=>!e.dead&&dist(e,p)<135).forEach(e=>hit(e,2.45,360));spawnImpact(p.x+dx*34,p.y+dy*34,2,180,.5);game.screenShake=12;}
+    else if(type==="spear"){p.vx=dx*470;p.vy=dy*470;game.enemies.filter(e=>!e.dead&&pointSegmentDistance(e.x,e.y,p.x,p.y,p.x+dx*190,p.y+dy*190)<e.radius+24).forEach(e=>hit(e,2.05,310));spawnImpact(p.x+dx*85,p.y+dy*85,1,145,.4);}
+    else {moveEntity(p,dx*55,dy*55,p.radius);game.enemies.filter(e=>!e.dead&&dist(e,p)<82).forEach(e=>{hit(e,1.15,130);hit(e,.9,90);});spawnImpact(p.x,p.y,4,115,.38);}
+    playWeaponSfx(type,3);
   }
 
   function dash() {
@@ -725,6 +773,8 @@
     if (game.scene === "camp") return openPanel("continent-panel");
     if (game.scene !== "expedition" || game.paused || isModalOpen()) return;
     const p = game.player;
+    const drop=game.groundDrops.filter(d=>dist(d,p)<58).sort((a,b)=>dist(a,p)-dist(b,p))[0];
+    if(drop){pickupGroundDrop(drop);return;}
     const altar = game.altars.find(a => !a.lit && dist(a, p) < 48);
     if (altar) { altar.lit = true; burst(altar.x, altar.y, "#ff8ce6", 22, 145); toast("深渊祭坛已点燃，视野扩大", "#ff95e6"); beep(520, .3, "sine", .04); return; }
     const resource = game.resources.find(r => !r.gathered && dist(r, p) < 44);
@@ -789,15 +839,16 @@
     numberFx(e.x, e.y - 28, `+${xp} XP  +${gold} ◉`, "#f8d16a"); burst(e.x, e.y, e.color, e.boss ? 35 : 13, e.boss ? 220 : 120);
     if (e.boss) {
       game.world.exitLocked = false;
-      addItem(generateItem(game.biome, game.depth, 2, new RNG(Date.now() + "boss1")));
-      addItem(generateItem(game.biome, game.depth, 1, new RNG(Date.now() + "boss2")));
-      game.save.player.potions = Math.min(5, game.save.player.potions + 2);
+      spawnGroundDrop("equipment",e.x-20,e.y,{item:generateItem(game.biome, game.depth, 2, new RNG(Date.now() + "boss1"))});
+      spawnGroundDrop("equipment",e.x+20,e.y,{item:generateItem(game.biome, game.depth, 1, new RNG(Date.now() + "boss2"))});
+      spawnGroundDrop("potion",e.x,e.y+18);spawnGroundDrop("potion",e.x,e.y+18);
       toast(`${e.name} 已被击败，通往营地的星门开启！`, "#ffe580");
     } else if (Math.random() < .115 + game.save.skills.explore.alchemy * .08) {
-      addItem(generateItem(game.biome, game.depth));
+      spawnGroundDrop("equipment",e.x,e.y,{item:generateItem(game.biome, game.depth)});
     }
     const biome=BIOMES[game.biome],rareChance=e.boss?1:Math.min(.92,(e.elite?.72:.07+game.depth*.012)*(1+statValue("rareFind")));
-    if(Math.random()<rareChance){const amount=e.boss?2:1;game.save.materials[biome.rare]=(game.save.materials[biome.rare]||0)+amount;numberFx(e.x,e.y-46,`+${amount} ${biome.rareName}`,biome.accent);toast(`怪物掉落：${biome.rareName} ×${amount}`,biome.accent);}
+    if(Math.random()<rareChance){const amount=e.boss?2:1;spawnGroundDrop("material",e.x,e.y,{material:biome.rare,amount});numberFx(e.x,e.y-46,`${biome.rareName} ×${amount}`,biome.accent);}
+    if(!e.boss&&Math.random()<(e.elite?.24:.055))spawnGroundDrop("potion",e.x,e.y);
     checkLevelUp(); updateHUD();
   }
 
@@ -850,6 +901,7 @@
     const p = game.player, biome = game.biome, pattern = e.pattern++ % 4, enraged = e.hp < e.maxHp * .45;
     if (enraged && !e.enraged) { e.enraged = true; toast(`${e.name}进入元素暴走阶段！`, BIOMES[biome].accent); }
     const bonus = enraged ? 3 : 0, aim = Math.atan2(p.y - e.y, p.x - e.x);
+    spawnMonsterFx(e.x+Math.cos(aim)*42,e.y+Math.sin(aim)*36,biome,pattern,aim,155,.68);
     if (biome === 0) {
       if (pattern === 0) { addCircle(p.x,p.y,58,.82,e.damage*1.2,"#82d764","stun",10); for(let i=0;i<6+bonus;i++){const a=i/(6+bonus)*Math.PI*2;addCircle(p.x+Math.cos(a)*98,p.y+Math.sin(a)*98,28,.95,e.damage*.8,"#6fbd55","poison",10);} }
       if (pattern === 1) { fireRadial(e,10+bonus,155,5,e.damage*.72,"poison",game.zoneTime); if(game.enemies.filter(x=>!x.dead&&!x.boss).length<18){for(let i=0;i<(enraged?3:2);i++){const a=i*Math.PI+(Math.random()-.5);spawnEnemy(1,e.x+Math.cos(a)*75,e.y+Math.sin(a)*75,false);}} }
@@ -893,8 +945,9 @@
 
   function performEnemyAttack(e) {
     const p=game.player,a=e.attack,id=e.pendingAttack||a?.id,tx=e.targetX,ty=e.targetY,dx=tx-e.x,dy=ty-e.y,len=Math.hypot(dx,dy)||1,bonus=Math.floor((game.depth-1)/2);
-    const projectile=(effect,status,speed=230,mult=1,homing=0,angleOffset=0)=>{const ang=Math.atan2(dy,dx)+angleOffset;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(ang),dy:Math.sin(ang),speed,effect,damage:e.damage*mult,status,homing,owner:e});};
-    playAttackSfx(id);if(id==="bossMelee"){addCircle(e.x,e.y,e.radius+42,.18,e.damage,"#ff8c68",null,0);}
+    const fx={col:game.biome,row:clamp(e.typeIndex||0,0,3)},aim=Math.atan2(dy,dx);
+    const projectile=(effect,status,speed=230,mult=1,homing=0,angleOffset=0)=>{const ang=fx.aim+angleOffset;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(ang),dy:Math.sin(ang),speed,effect,damage:e.damage*mult,status,homing,owner:e,monsterFx:fx});};
+    spawnMonsterFx(e.x+dx/len*34,e.y+dy/len*28,fx.col,fx.row,fx.aim,e.boss?130:82,e.boss?.55:.4);playAttackSfx(id);if(id==="bossMelee"){addCircle(e.x,e.y,e.radius+42,.18,e.damage,"#ff8c68",null,0);}
     else if(id==="slimeLeap")startCharge(e,tx,ty,275,.48,e.damage,"poison");
     else if(id==="poisonSpore")projectile(5,"poison",155,1,0.15);
     else if(id==="rootLine")addLine(e.x,e.y,e.x+dx/len*280,e.y+dy/len*280,16,.45,e.damage,"#77c85b","stun",10);
@@ -930,7 +983,7 @@
 
   function updatePlayer(dt) {
     const p = game.player; const st = stats();
-    p.invuln -= dt; p.attackCd -= dt; p.dash -= dt; p.hurtFx = Math.max(0,(p.hurtFx||0)-dt); p.statusTick = (p.statusTick||0)-dt;
+    p.invuln -= dt; p.attackCd -= dt; p.dash -= dt;p.activeCd1=Math.max(0,(p.activeCd1||0)-dt);p.activeCd2=Math.max(0,(p.activeCd2||0)-dt);p.recoveryPose=Math.max(0,(p.recoveryPose||0)-dt); p.hurtFx = Math.max(0,(p.hurtFx||0)-dt); p.statusTick = (p.statusTick||0)-dt;
     p.statuses ||= {};
     Object.keys(p.statuses).forEach(k=>{p.statuses[k]-=dt;if(p.statuses[k]<=0)delete p.statuses[k];});
     if(p.statusTick<=0&&(p.statuses.burn||p.statuses.poison)){p.statusTick=.65;const dot=p.statuses.burn?stats().maxHp*.025:stats().maxHp*.018;game.save.player.hp-=dot;numberFx(p.x,p.y-28,`-${Math.ceil(dot)}`,p.statuses.burn?"#ff8a43":"#99db4d");spawnImpact(p.x,p.y,p.statuses.burn?1:3,34,.35);if(game.save.player.hp<=0)die();}
@@ -940,25 +993,28 @@
     let iy = (game.keys.has("KeyS") || game.keys.has("ArrowDown") ? 1 : 0) - (game.keys.has("KeyW") || game.keys.has("ArrowUp") ? 1 : 0);
     if(p.statuses.stun){ix=iy=0;}if(p.statuses.charm){ix*=-1;iy*=-1;}
     const len = Math.hypot(ix, iy) || 1; ix /= len; iy /= len;
-    if ((ix || iy) && p.dash <= 0) { p.dirX = ix; p.dirY = iy; }
+    p.running=!!(p.runKey&&game.keys.has(p.runKey)&&performance.now()<p.runUntil);
+    if ((ix || iy) && p.dash <= 0&&!p.swing) setPlayerAim(ix,iy);
     if (p.dash <= 0) {
       const ice = game.biome === 2 && game.scene === "expedition";
       const grip = ice ? .07 : .28;
       const statusSpeed=p.statuses.slow?.58:1;
-      p.vx = lerp(p.vx, ix * st.moveSpeed*statusSpeed, 1 - Math.pow(grip, dt * 12));
-      p.vy = lerp(p.vy, iy * st.moveSpeed*statusSpeed, 1 - Math.pow(grip, dt * 12));
+      const pace=p.running?1.52:1;
+      p.vx = lerp(p.vx, ix * st.moveSpeed*statusSpeed*pace, 1 - Math.pow(grip, dt * 12));
+      p.vy = lerp(p.vy, iy * st.moveSpeed*statusSpeed*pace, 1 - Math.pow(grip, dt * 12));
     }
     moveEntity(p, p.vx * dt, p.vy * dt, p.radius);
+    if(game.scene==="camp"){p.x=clamp(p.x,28,W-28);p.y=clamp(p.y,185,H-42);}
     if (p.dash > 0 && Math.random() < .6) game.particles.push({ x: p.x, y: p.y, vx: -p.vx * .08, vy: -p.vy * .08, life: .25, max: .25, color: "#aee5ff", size: 6 });
     if (p.swing) {
       p.swing.t -= dt; const swing = p.swing;
       if (swing.t < swing.max * .76 && swing.t > swing.max * .18) {
-        if(swing.weaponType==="staff"&&!swing.fired){swing.fired=true;const mult=swing.combo===3?1.75:1;spawnProjectile({x:p.x+swing.dx*18,y:p.y+swing.dy*18,dx:swing.dx,dy:swing.dy,speed:330,damage:st.attack*swing.profile.damage*mult,team:"player",effect:3,radius:11,pierce:swing.combo===3?2:0});beep(520,.09,"sine",.03);}
-        const reach=swing.profile.reach+(swing.combo===3?10:0),hitX=p.x+swing.dx*reach*.72,hitY=p.y+swing.dy*reach*.72;
+        if(swing.weaponType==="staff"&&!swing.fired){swing.fired=true;const mult=swing.combo===3?1.75:1,spread=swing.combo===3?[-.16,0,.16]:[0];spread.forEach(off=>{const a=Math.atan2(swing.dy,swing.dx)+off;spawnProjectile({x:p.x+swing.dx*18,y:p.y+swing.dy*18,dx:Math.cos(a),dy:Math.sin(a),speed:330,damage:st.attack*swing.profile.damage*mult,team:"player",effect:3,radius:11,pierce:swing.combo===3?2:0});});beep(520,.09,"sine",.03);}
+        const reach=swing.profile.reach+(swing.combo===3?(swing.weaponType==="sword"?34:swing.weaponType==="axe"?22:14):0),hitX=p.x+swing.dx*reach,hitY=p.y+swing.dy*reach;
         game.enemies.forEach(e => {
           if (e.dead || swing.hits.has(e) || swing.weaponType==="staff") return;
-          const ex = Math.abs(e.x - hitX), ey = Math.abs(e.y - hitY); const range = e.radius + swing.profile.width+(swing.combo===3?8:0);
-          if (ex < range && ey < range) {
+          const radialFinisher=swing.combo===3&&["sword","axe"].includes(swing.weaponType),range=e.radius+swing.profile.width+(swing.combo===3?(swing.weaponType==="axe"?28:12):0)+(radialFinisher?reach*.65:0),distance=radialFinisher?dist(e,p):pointSegmentDistance(e.x,e.y,p.x,p.y,hitX,hitY);
+          if (distance < range) {
             swing.hits.add(e); let mult = (swing.combo === 1 ? 1 : swing.combo === 2 ? 1.15 : 1.7)*swing.profile.damage;
             if (swing.combo === 3 && game.save.skills.fury.finisher) mult *= 2;
             if (Object.values(game.save.equipment.equipped).some(i => i && i.legendary?.id === "voidheart") && game.save.player.hp < st.maxHp * .3) mult *= 1.25;
@@ -972,7 +1028,7 @@
           }
         });
       }
-      if (swing.t <= 0) p.swing = null;
+      if (swing.t <= 0) {if(swing.combo===3)p.recoveryPose=.34;p.swing = null;}
     }
     if (game.scene === "expedition" && game.world) {
       const tx = Math.floor(p.x / TILE), ty = Math.floor(p.y / TILE); game.world.revealed.add(`${tx},${ty}`);
@@ -1005,7 +1061,7 @@
   function updateProjectiles(dt){
     for(let i=game.projectiles.length-1;i>=0;i--){const q=game.projectiles[i];q.life-=dt;q.spin+=dt*7;if(q.homing){const target=q.team==="enemy"?game.player:game.enemies.filter(e=>!e.dead).sort((a,b)=>dist(a,q)-dist(b,q))[0];if(target){const speed=Math.hypot(q.vx,q.vy),a=Math.atan2(target.y-q.y,target.x-q.x),wantedX=Math.cos(a)*speed,wantedY=Math.sin(a)*speed;q.vx=lerp(q.vx,wantedX,Math.min(1,q.homing*dt));q.vy=lerp(q.vy,wantedY,Math.min(1,q.homing*dt));}}
       q.x+=q.vx*dt;q.y+=q.vy*dt;let remove=q.life<=0||!isWalkable(q.x,q.y);
-      if(!remove&&q.team==="enemy"&&dist(q,game.player)<q.radius+game.player.radius){if(damagePlayer(q.damage,q.x,q.y))applyPlayerStatus(q.status,q.status==="stun"?.65:2.8);spawnImpact(q.x,q.y,q.effect,48);remove=true;}
+      if(!remove&&q.team==="enemy"&&dist(q,game.player)<q.radius+game.player.radius){if(damagePlayer(q.damage,q.x,q.y))applyPlayerStatus(q.status,q.status==="stun"?.65:2.8);if(q.monsterFx)spawnMonsterFx(q.x,q.y,q.monsterFx.col,q.monsterFx.row,Math.atan2(q.vy,q.vx),68,.32);else spawnImpact(q.x,q.y,q.effect,48);remove=true;}
       if(!remove&&q.team==="player"){for(const e of game.enemies){if(e.dead||q.hit?.has(e)||dist(q,e)>=q.radius+e.radius)continue;q.hit||=(new Set());q.hit.add(e);const crit=Math.random()<stats().critRate;damageEnemy(e,q.damage*offensiveMultiplier(e,true)*(crit?stats().critDamage:1),crit,q.vx*.18,q.vy*.18);rollOffensiveAffixes(e);spawnImpact(q.x,q.y,q.effect,54);if(q.pierce>0)q.pierce--;else remove=true;break;}}
       if(remove)game.projectiles.splice(i,1);
     }
@@ -1039,6 +1095,7 @@
   }
   function drawBiomeObject(col,x,y,size,opts={}){return drawAtlasCell(ART[BIOME_ART_KEYS[game.biome]],col,1,5,2,x,y,size,size,opts);}
   function drawEffect(index,x,y,size,opts={}){return drawAtlasCell(ART.effects,index%5,Math.floor(index/5),5,3,x,y,size,size,opts);}
+  function drawMonsterEffect(col,row,x,y,size,opts={}){return drawAtlasCell(ART.monsterEffects,col,row,5,4,x,y,size,size,opts);}
 
   function drawCamp(time) {
     const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,"#141b2b");grad.addColorStop(1,"#1b211f");ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
@@ -1048,7 +1105,7 @@
       const px=170+i*235,unlocked=game.save.progress.unlocked.includes(i),img=ART[BIOME_ART_KEYS[i]],pulse=1+Math.sin(time*2+i)*.035;drawAtlasCell(img,2,1,5,2,px,102,112*pulse,112*pulse,{alpha:unlocked?1:.28,filter:unlocked?"none":"grayscale(1)"});
     }
     drawAtlasCell(ART.waste,4,1,5,2,205,492,150+Math.sin(time*5)*3,150+Math.sin(time*5)*3);drawAtlasCell(ART.forest,4,1,5,2,1050,492,145,145,{alpha:.9});
-    drawPlayer(game.player.x, game.player.y, time);
+    drawPlayer(game.player, time);
     ctx.fillStyle = "#fff1bf"; ctx.font = "700 14px Microsoft YaHei"; ctx.textAlign = "center"; ctx.fillText("星门 [M]", W / 2, 188); ctx.fillText("元素铁匠铺 [B]", 205, 390); ctx.textAlign = "left";
   }
 
@@ -1071,18 +1128,29 @@
 
   function drawEnemy(e, time) {
     if(e.dead)return;const flying=(game.biome===2&&e.typeIndex===0)||(game.biome===3&&[0,2,3].includes(e.typeIndex))||(game.biome===4&&[0,2,3].includes(e.typeIndex)),slime=game.biome===0&&e.typeIndex===0,bob=flying?Math.sin(time*4+e.phase)*6:Math.sin(time*2.4+e.phase)*1.8;let sx=1,sy=1,rot=0;if(slime){sx=1+Math.sin(time*5+e.phase)*.08;sy=1-Math.sin(time*5+e.phase)*.07;}if(e.state==="windup"){sx*=.9+Math.sin(time*18)*.04;sy*=1.08;}if(e.state==="charge")rot=Math.atan2(e.vy,e.vx)*.08;
-    const size=e.boss?132:(e.elite?78:66),img=ART[BIOME_ART_KEYS[game.biome]];ctx.save();ctx.translate(e.x,e.y+bob);if(e.elite){ctx.rotate(time*.7);ctx.strokeStyle="#ffd765";ctx.globalAlpha=.72;ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,31+Math.sin(time*5)*3,0,Math.PI*1.5);ctx.stroke();ctx.rotate(-time*.7);}ctx.scale(sx,sy);drawAtlasCell(img,e.boss?4:e.typeIndex,0,5,2,0,-size*.08,size,size,{flip:e.vx<-.5,rotation:rot,filter:e.flash>0?"brightness(3) saturate(0)":"none"});ctx.restore();
+    const size=e.boss?132:(e.elite?78:66),img=ART[BIOME_ART_KEYS[game.biome]];if(e.elite)drawAtlasCell(ART.eliteLoot,game.biome,0,5,2,e.x,e.y+e.radius*.58,92+Math.sin(time*5)*4,48,{alpha:.82});ctx.save();ctx.translate(e.x,e.y+bob);ctx.scale(sx,sy);drawAtlasCell(img,e.boss?4:e.typeIndex,0,5,2,0,-size*.08,size,size,{flip:e.vx<-.5,rotation:rot,filter:e.flash>0?"brightness(3) saturate(0)":"none"});ctx.restore();
     if(e.state==="windup"){ctx.fillStyle="#ffdfb0";ctx.font="900 10px Microsoft YaHei";ctx.textAlign="center";ctx.fillText(e.boss?"重击":e.attack.name,e.x,e.y-size*.58-8);ctx.textAlign="left";}if(!e.boss&&e.hp<e.maxHp){ctx.fillStyle="#1a1015";ctx.fillRect(e.x-20,e.y-size*.48,40,5);ctx.fillStyle=e.elite?"#ffd15c":"#e45a55";ctx.fillRect(e.x-20,e.y-size*.48,40*Math.max(0,e.hp/e.maxHp),5);}Object.keys(e.statuses||{}).forEach((s,i)=>drawEffect({burn:11,slow:12,poison:13,stun:14}[s]??10,e.x-13+i*13,e.y-size*.58-19,24,{alpha:.9}));
   }
 
   function drawPlayer(p, time) {
-    const type=equippedWeaponType(),col=WEAPON_TYPES.indexOf(type),row=p.hurtFx>0?2:p.swing?1:0,bob=p.dash>0?0:Math.sin(time*2.5)*1.5,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):Math.atan2(p.dirY,p.dirX);ctx.save();if(p.invuln>0&&Math.floor(time*18)%2)ctx.globalAlpha=.46;drawAtlasCell(ART.hero,col,row,5,3,p.x,p.y-20+bob,88,88,{flip:p.dirX<0,filter:p.hurtFx>0?"brightness(1.5) saturate(.7)":"none"});if(p.swing&&type!=="staff"){const progress=1-p.swing.t/p.swing.max,effectSize=(type==="axe"?88:type==="spear"?74:66)+(p.swing.combo===3?12:0);drawEffect(col,p.x+p.swing.dx*36,p.y+p.swing.dy*30,effectSize,{rotation:angle+(type==="sword"?progress*.5:0),alpha:.72});}ctx.restore();
+    const type=equippedWeaponType(),speed=Math.hypot(p.vx,p.vy),moving=speed>12,row=p.swing?3:p.recoveryPose>0?4:p.running&&moving?2:moving?1:0,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):(Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX)),ax=Math.cos(angle),ay=Math.sin(angle),dirCol=Math.abs(ax)>=Math.abs(ay)?(ax>=0?0:2):(ay>=0?1:3),cycle=p.running?15:moving?9:2.5,bob=p.dash>0?0:Math.sin(time*cycle)*(p.running?3:moving?1.8:1),tilt=moving?Math.sin(time*cycle)*.018:0,equipped=game.save.equipment.equipped;
+    const blinkAlpha=p.invuln>0&&Math.floor(time*18)%2?.46:1;ctx.save();ctx.globalAlpha=blinkAlpha;
+    if(equipped.amulet){const c=BIOMES[equipped.amulet.region||0].accent;ctx.globalAlpha=blinkAlpha*(.18+.05*Math.sin(time*5));ctx.fillStyle=c;ctx.beginPath();ctx.arc(p.x,p.y-19,35+Math.sin(time*4)*2,0,Math.PI*2);ctx.fill();ctx.globalAlpha=blinkAlpha;}
+    drawAtlasCell(ART.heroDirectional,dirCol,row,4,5,p.x,p.y-22+bob,82,102,{rotation:tilt,filter:p.hurtFx>0?"brightness(1.6) saturate(.65)":"none"});
+    if(equipped.boots){const c=equipmentCoords(equipped.boots);drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x,p.y+10+bob,31,31,{alpha:.68});}
+    if(equipped.armor){const c=equipmentCoords(equipped.armor);drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x,p.y-20+bob,44,44,{alpha:.55});}
+    if(equipped.helmet){const c=equipmentCoords(equipped.helmet);drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x,p.y-48+bob,32,32,{alpha:.8});}
+    if(equipped.weapon){const c=equipmentCoords(equipped.weapon),weaponSize=type==="spear"?50:type==="axe"?48:43;drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x+ax*27,p.y-17+ay*25+bob,weaponSize,weaponSize,{rotation:angle+Math.PI/4,alpha:.96});}
+    if(p.swing){const effectSize=(type==="axe"?105:type==="spear"?82:type==="staff"?72:76)+(p.swing.combo===3?18:0),offset={sword:0,spear:Math.PI/4,axe:0,staff:Math.PI/4,daggers:2.5}[type]||0;drawEffect(WEAPON_TYPES.indexOf(type),p.x+ax*39,p.y+ay*34,effectSize,{rotation:angle+offset,alpha:.78});}
+    ctx.restore();
     const statuses=Object.keys(p.statuses||{});statuses.forEach((s,i)=>{const idx={burn:11,slow:12,poison:13,stun:14,charm:9}[s];drawEffect(idx,p.x-18+i*12,p.y-55,25,{alpha:.82});});
   }
 
   function drawTelegraph(t){const pct=1-t.life/t.max;ctx.save();ctx.globalAlpha=.16+pct*.48;ctx.fillStyle=t.color;ctx.strokeStyle=t.color;ctx.lineWidth=3;if(t.type==="circle"){ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(t.x,t.y,t.r*(.2+pct*.8),0,Math.PI*2);ctx.stroke();}else if(t.type==="line"){ctx.lineWidth=t.width*2;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();ctx.globalAlpha=.9;ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();}else{ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.arc(t.x,t.y,t.range,t.angle-t.arc/2,t.angle+t.arc/2);ctx.closePath();ctx.fill();}ctx.restore();}
-  function drawProjectile(q){const a=Math.atan2(q.vy,q.vx);drawEffect(q.effect,q.x,q.y,q.radius*3.8,{rotation:a,alpha:.96});}
-  function drawImpactFx(f){const pct=1-f.life/f.max;drawEffect(f.effect,f.x,f.y,f.size*(.55+pct*.65),{rotation:f.rotation,alpha:1-pct});}
+  function drawProjectile(q){const a=Math.atan2(q.vy,q.vx);if(q.monsterFx)drawMonsterEffect(q.monsterFx.col,q.monsterFx.row,q.x,q.y,q.radius*5.6,{rotation:a,alpha:.96});else drawEffect(q.effect,q.x,q.y,q.radius*3.8,{rotation:a+(q.team==="player"&&q.effect===3?Math.PI/4:0),alpha:.96});}
+  function drawImpactFx(f){const pct=1-f.life/f.max;if(f.monsterFx)drawMonsterEffect(f.monsterFx.col,f.monsterFx.row,f.x,f.y,f.size*(.65+pct*.55),{rotation:f.rotation,alpha:1-pct});else drawEffect(f.effect,f.x,f.y,f.size*(.55+pct*.65),{rotation:f.rotation,alpha:1-pct});}
+
+  function drawGroundDrop(d,time){d.life=(d.life||0)+1/60;const bob=Math.sin(time*4+d.x*.02)*3,pulse=.78+.2*Math.sin(time*5+d.y*.03);ctx.save();ctx.globalAlpha=.2+pulse*.12;ctx.fillStyle=d.kind==="equipment"?qualityById(d.item.quality).color:d.kind==="potion"?"#79ef91":BIOMES[game.biome].accent;ctx.beginPath();ctx.ellipse(d.x,d.y+11,25,9,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(d.kind==="equipment"){const c=equipmentCoords(d.item);drawAtlasCell(ART.equipment,c.col,c.row,5,5,d.x,d.y-8+bob,48,48);ctx.strokeStyle=qualityById(d.item.quality).color;ctx.strokeRect(d.x-20,d.y-28+bob,40,40);}else if(d.kind==="potion")drawAtlasCell(ART.eliteLoot,game.biome,1,5,2,d.x,d.y-7+bob,46,46);else{const c=materialCoords(d.material);drawAtlasCell(ART.materials,c.col,c.row,5,4,d.x,d.y-7+bob,44,44);}ctx.restore();}
 
   function drawAmbient(time){const bx=game.camera.x,by=game.camera.y;ctx.save();if(game.biome===0){for(let i=0;i<8;i++){const x=bx+((i*211+time*13)% (W+260))-130,y=by+90+(i*83)%H;const g=ctx.createRadialGradient(x,y,0,x,y,90);g.addColorStop(0,"rgba(170,220,175,.09)");g.addColorStop(1,"rgba(80,130,90,0)");ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(x,y,120,38,0,0,Math.PI*2);ctx.fill();}}else{for(let i=0;i<34;i++){let x=bx+(i*97+(game.biome===3?time*150:time*(18+game.biome*13)))%W,y=by+(i*61+(game.biome===2?time*70:-time*24))%H;ctx.globalAlpha=.25+(i%5)*.1;ctx.fillStyle=game.biome===1?"#ff9b4c":game.biome===2?"#e8fbff":game.biome===3?"#a98cff":"#e34db3";if(game.biome===2){ctx.fillRect(x,y,3,7);}else if(game.biome===3){ctx.fillRect(x,y,2,12);}else{ctx.fillRect(x,y,3,3);}}}ctx.restore();}
 
@@ -1091,7 +1159,7 @@
     const minX = Math.max(0, Math.floor(game.camera.x / TILE) - 1), maxX = Math.min(w.cols, Math.ceil((game.camera.x + W) / TILE) + 1);
     const minY = Math.max(0, Math.floor(game.camera.y / TILE) - 1), maxY = Math.min(w.rows, Math.ceil((game.camera.y + H) / TILE) + 1);
     for (let y = minY; y < maxY; y++) for (let x = minX; x < maxX; x++) drawTile(x, y, w.tiles[y][x], b,time);
-    game.resources.forEach(r => drawResource(r, time)); game.altars.forEach(a => drawAltar(a, time));
+    game.resources.forEach(r => drawResource(r, time)); game.altars.forEach(a => drawAltar(a, time));game.groundDrops.forEach(d=>drawGroundDrop(d,time));
     game.telegraphs.forEach(drawTelegraph);game.projectiles.forEach(drawProjectile);
     [...game.enemies.filter(e => !e.dead), game.player].sort((a,b2) => a.y - b2.y).forEach(e => e === game.player ? drawPlayer(e, time) : drawEnemy(e, time));
     game.impacts.forEach(drawImpactFx);
@@ -1144,9 +1212,10 @@
     $("gold-text").textContent = fmt(game.save.currencies.gold); $("void-text").textContent = fmt(game.save.currencies.void); $("potion-text").textContent = `×${p.potions}`;
     $("bag-badge").textContent = game.unseenItems ? `+${game.unseenItems} 新 · ${game.save.equipment.inventory.length}/30` : `${game.save.equipment.inventory.length} / 30`;
     $("inventory-btn").classList.toggle("has-new", game.unseenItems > 0);
+    $("return-dock-btn")?.classList.toggle("hidden",game.scene!=="expedition");
     $("sp-badge").textContent = game.save.player.skillPoints ? `${game.save.player.skillPoints} 点可用` : "0 点";
     if (game.scene === "camp") {
-      $("area-name").textContent = "星火营地"; $("depth-text").textContent = "安全区 · 星门已激活"; $("quest-text").textContent = "按 M 选择远征大陆，或按 B 使用铁匠铺";
+      $("area-name").textContent = "星火营地"; $("depth-text").textContent = "安全区 · 可自由移动"; $("quest-text").textContent = "WASD 在营地移动；按 M 选择远征，按 B 打造装备";
       $("boss-wrap").classList.add("hidden"); return;
     }
     const b = BIOMES[game.biome]; $("area-name").textContent = b.name; $("depth-text").textContent = `深度 ${game.depth} / 5 · ${b.mechanic}`;
@@ -1158,8 +1227,10 @@
       $("boss-wrap").classList.add("hidden");
       const ex = { x: (game.world.exit.x + .5) * TILE, y: (game.world.exit.y + .5) * TILE };
       const nearby = game.resources.find(r => !r.gathered && dist(r, game.player) < 55);
+      const drop = game.groundDrops.find(d=>dist(d,game.player)<65);
       const altar = game.altars.find(a => !a.lit && dist(a, game.player) < 60);
-      if (altar) $("quest-text").textContent = "按 E 点燃深渊祭坛，扩展视野";
+      if(drop) $("quest-text").textContent=`按 E 拾取${drop.kind==="equipment"?drop.item.name:drop.kind==="potion"?"生命药水":MATERIAL_NAMES[drop.material]}`;
+      else if (altar) $("quest-text").textContent = "按 E 点燃深渊祭坛，扩展视野";
       else if (nearby) $("quest-text").textContent = `按 E 开采${MATERIAL_NAMES[nearby.type]}`;
       else if (dist(ex, game.player) < 80) $("quest-text").textContent = `按 E 进入${game.depth < 5 ? "下一深度" : "返程星门"}`;
       else $("quest-text").textContent = game.depth === 5 ? "穿越迷宫，寻找盘踞核心的区域领主" : "探索地图、采集资源并寻找远端星门";
@@ -1173,6 +1244,7 @@
     if (id === "character-panel") renderCharacterPanel();
     if (id === "skills-panel") renderSkills();
     if (id === "forge-panel") renderForge();
+    if (id === "save-panel") renderSavePanel();
     panel.classList.remove("hidden"); game.paused = true;
   }
 
@@ -1186,6 +1258,8 @@
     document.querySelectorAll(".modal").forEach(m => m.classList.add("hidden"));
     $("tooltip").classList.add("hidden"); if (game.scene !== "title") game.paused = false;
   }
+
+  function renderSavePanel(){const root=$("save-slots");if(!root)return;const entries=[{name:"自动存档",loaded:readSavedGame(),auto:true},...SLOT_SAVE_KEYS.map((k,i)=>({name:`手动存档 ${i+1}`,loaded:readSaveKey(k,`slot-${i+1}`),index:i}))];root.innerHTML="";entries.forEach(entry=>{const l=entry.loaded,node=document.createElement("article"),place=l?.session?.scene==="expedition"?`${BIOMES[l.session.biome]?.name||"远征"} · 深度 ${l.session.depth}/5`:l?"星火营地":"空档位",when=l?.savedAt?new Date(l.savedAt).toLocaleString("zh-CN"):"尚未保存";node.className=`save-slot ${entry.auto?"current":""}`;node.innerHTML=`<div><h3>${entry.name}</h3><p>${place} · ${when}${l?` · LV.${l.save.player.level}`:""}</p></div><div class="save-slot-actions">${l?'<button class="load-slot primary">载入</button>':""}${game.scene!=="title"?`<button class="write-slot">${entry.auto?"覆盖自动档":"保存到此档"}</button>`:""}</div>`;node.querySelector(".load-slot")?.addEventListener("click",()=>loadDecodedGame(l));node.querySelector(".write-slot")?.addEventListener("click",()=>entry.auto?(saveGame(false),renderSavePanel()):saveGameToSlot(entry.index));root.append(node);});}
 
   function renderContinentPanel() {
     const grid = $("continent-grid"); grid.innerHTML = "";
@@ -1232,12 +1306,12 @@
     const st = stats(); const rows = [
       ["攻击力",fmt(st.attack)],["防御力",fmt(st.defense)],["最大生命",fmt(st.maxHp)],["暴击率",formatStat("critRate",st.critRate)],
       ["暴击伤害",formatStat("critDamage",st.critDamage)],["攻击速度",formatStat("attackSpeed",st.attackSpeed-1)],["闪避率",formatStat("dodge",st.dodge)],
-      ["伤害减免",formatStat("reduction",st.reduction)],["移动速度",formatStat("moveSpeed",st.moveSpeed/155-1)],["生命偷取",formatStat("lifeSteal",st.lifeSteal)],
+      ["伤害减免",formatStat("reduction",st.reduction)],["移动速度",formatStat("moveSpeed",st.moveSpeed/124-1)],["生命偷取",formatStat("lifeSteal",st.lifeSteal)],
       ["元素增伤",formatStat("elementalDamage",statValue("elementalDamage"))],["稀有寻获",formatStat("rareFind",statValue("rareFind"))]
     ];
     $("stats-list").innerHTML = rows.map(r=>`<div class="stat-row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("");
     const inv = game.save.equipment.inventory; $("inventory-count").textContent = `${inv.length} / 30`; const grid = $("inventory-grid"); grid.innerHTML = "";
-    inv.forEach(item => { const n=document.createElement("div"); n.className=`item-cell quality-${item.quality}`; n.innerHTML=`${itemArtHTML(item)}<b>${item.name}</b>${item.enhance?`<span class="plus">+${item.enhance}</span>`:""}`; bindItemTooltip(n,item); n.addEventListener("click",()=>equipItem(item.id)); grid.append(n); });
+    inv.forEach(item => { const n=document.createElement("div"); n.className=`item-cell quality-${item.quality}`; n.innerHTML=`${itemArtHTML(item)}<b>${item.name}</b>${item.enhance?`<span class="plus">+${item.enhance}</span>`:""}<button class="sell-btn" title="出售装备">售</button>`; bindItemTooltip(n,item); n.addEventListener("click",()=>equipItem(item.id));n.querySelector(".sell-btn").addEventListener("click",e=>{e.stopPropagation();sellItem(item.id);}); grid.append(n); });
     for(let i=inv.length;i<30;i++){const n=document.createElement("div");n.className="item-cell";grid.append(n);}
     $("materials-list").innerHTML = Object.entries(game.save.materials).filter(([,v])=>v>0).map(([k,v])=>`<div class="material">${materialArtHTML(k)}<span>${MATERIAL_NAMES[k]}</span><b>${v}</b></div>`).join("") || `<div class="hint">尚未获得材料</div>`;
     updateHUD();
@@ -1254,8 +1328,10 @@
     inv.push(item);game.save.equipment.equipped[slot]=null;game.save.player.hp=Math.min(stats().maxHp,game.save.player.hp);renderCharacterPanel();saveGame(true);
   }
 
+  function sellItem(id){const inv=game.save.equipment.inventory,idx=inv.findIndex(i=>i.id===id);if(idx<0)return;const item=inv[idx],qi=QUALITIES.findIndex(q=>q.id===item.quality)+1,value=Math.max(10,Math.round(item.level*qi*5*(1+item.enhance*.35)));inv.splice(idx,1);game.save.currencies.gold+=value;toast(`出售 ${item.name}，获得 ${value} 金币`,"#f2c65d");beep(360,.08,"triangle",.025);renderCharacterPanel();saveGame(true);}
+
   function renderSkills() {
-    $("sp-text").textContent=game.save.player.skillPoints;const root=$("skill-trees");root.innerHTML="";
+    $("sp-text").textContent=game.save.player.skillPoints;const type=equippedWeaponType(),names={sword:"回旋星斩：环身一周击退全部近敌",spear:"贯星突阵：沿瞄准方向穿透冲锋",axe:"陨星震击：大范围重击并强力击退",staff:"五芒散射：发射五枚可穿透星弹",daggers:"瞬影双杀：闪现后连续斩击"};$("active-skills").innerHTML=`<article class="active-skill" data-key="R"><strong>${WEAPON_NAMES[type]}专属战技</strong><p>${names[type]}。消耗 28 耐力，5.2 秒冷却。</p></article><article class="active-skill" data-key="F"><strong>星爆术</strong><p>引爆周身星力并发射十二道星屑。消耗 45 耐力，9 秒冷却。</p></article>`;const root=$("skill-trees");root.innerHTML="";
     SKILL_BRANCHES.forEach(branch=>{const div=document.createElement("div");div.className="skill-branch";div.style.setProperty("--branch",branch.color);div.innerHTML=`<h3>${branch.name}</h3><span class="hint">已投入 ${branchPoints(branch.id)} 点</span>`;
       branch.nodes.forEach(node=>{const [id,name,desc,req,max]=node,level=game.save.skills[branch.id][id],totalSpent=SKILL_BRANCHES.reduce((sum,b)=>sum+branchPoints(b.id),0),reqMet=req===8?totalSpent>=8:branchPoints(branch.id)>=req,available=reqMet&&(level<max);const el=document.createElement("div");el.className=`skill-node ${level?"unlocked":""} ${!available&&level<max?"locked":""}`;el.innerHTML=`<strong>${name}</strong><p>${desc}</p><span>等级 ${level} / ${max}${req?` · 需要${req===8?"总计":"本系"} ${req} 点`:""}</span>`;if(available)el.addEventListener("click",()=>buySkill(branch.id,id,max));div.append(el);});root.append(div);});
   }
@@ -1310,27 +1386,32 @@
   function handleKeyDown(e){
     if(e.code==="F5"||(e.code==="KeyS"&&(e.ctrlKey||e.metaKey))){e.preventDefault();if(game.scene!=="title")saveGame(false);return;}
     if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Tab"].includes(e.code))e.preventDefault();game.keys.add(e.code);if(e.repeat)return;
+    if(["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)){const now=performance.now(),last=game.player.lastTap[e.code]||0;if(last&&now-last<285){game.player.runKey=e.code;game.player.runUntil=now+10000;}game.player.lastTap[e.code]=now;}
     if(e.code==="Escape")return togglePause();if(game.scene==="title")return;
     if(e.code==="KeyC"||e.code==="KeyI"||e.code==="Tab")return isModalOpen()?closeAllModals():openPanel("character-panel");
     if(e.code==="KeyK")return isModalOpen()?closeAllModals():openPanel("skills-panel");
     if(e.code==="KeyM"&&game.scene==="camp")return openPanel("continent-panel");
     if(e.code==="KeyB"){if(game.scene==="camp")openPanel("forge-panel");else toast("铁匠铺只在星火营地开放");return;}
-    if(isModalOpen())return;if(e.code==="Space")dash();else if(e.code==="KeyQ")usePotion();else if(e.code==="KeyE")interact();else if(e.code==="KeyJ")attack(true);
+    if(e.code==="KeyL")return isModalOpen()?closeAllModals():openPanel("save-panel");
+    if(e.code==="KeyT"&&game.scene==="expedition")return enterCamp(false);
+    if(isModalOpen())return;if(e.code==="Space")dash();else if(e.code==="KeyQ")usePotion();else if(e.code==="KeyE")interact();else if(e.code==="KeyJ")attack(true);else if(e.code==="KeyR")useActiveSkill(1);else if(e.code==="KeyF")useActiveSkill(2);
   }
 
   function setupEvents(){
     $("new-game-btn").addEventListener("click",startNewGame);$("continue-btn").addEventListener("click",continueGame);updateTitleSaveMeta();setMusicTheme("title");
     document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closePanel(b.dataset.close)));
-    $("skills-btn").addEventListener("click",()=>openPanel("skills-panel"));$("resume-btn").addEventListener("click",()=>closePanel("pause-panel"));$("save-btn").addEventListener("click",()=>saveGame(false));
+    $("skills-btn").addEventListener("click",()=>openPanel("skills-panel"));$("resume-btn").addEventListener("click",()=>closePanel("pause-panel"));$("save-btn").addEventListener("click",()=>saveGame(false));$("pause-save-list-btn").addEventListener("click",()=>openPanel("save-panel"));
     $("inventory-btn").addEventListener("click",()=>openPanel("character-panel"));$("skill-dock-btn").addEventListener("click",()=>openPanel("skills-panel"));$("map-dock-btn").addEventListener("click",()=>game.scene==="camp"?openPanel("continent-panel"):toast(`${BIOMES[game.biome].name} · 深度 ${game.depth}/5：${BIOMES[game.biome].mechanic}`,BIOMES[game.biome].accent));
-    $("return-camp-btn").addEventListener("click",()=>enterCamp(false));$("revive-btn").addEventListener("click",()=>enterCamp(false));
+    $("save-list-btn").addEventListener("click",()=>openPanel("save-panel"));$("return-dock-btn").addEventListener("click",()=>enterCamp(false));$("return-camp-btn").addEventListener("click",()=>enterCamp(false));$("revive-btn").addEventListener("click",()=>enterCamp(false));
     document.querySelectorAll("[data-forge-tab]").forEach(b=>b.addEventListener("click",()=>{game.forgeTab=b.dataset.forgeTab;renderForge();}));
-    addEventListener("keydown",handleKeyDown);addEventListener("keyup",e=>game.keys.delete(e.code));addEventListener("blur",()=>game.keys.clear());
-    canvas.addEventListener("pointermove",e=>{const r=canvas.getBoundingClientRect();game.mouse.x=(e.clientX-r.left)/r.width*W;game.mouse.y=(e.clientY-r.top)/r.height*H;});
+    addEventListener("keydown",handleKeyDown);addEventListener("keyup",e=>{game.keys.delete(e.code);if(game.player.runKey===e.code){game.player.runKey=null;game.player.running=false;}});addEventListener("blur",()=>{game.keys.clear();game.player.running=false;});
+    canvas.addEventListener("pointermove",e=>{const r=canvas.getBoundingClientRect();game.mouse.x=(e.clientX-r.left)/r.width*W;game.mouse.y=(e.clientY-r.top)/r.height*H;if(game.scene!=="title"&&!game.player.swing){const wx=game.mouse.x+game.camera.x,wy=game.mouse.y+game.camera.y;setPlayerAim(wx-game.player.x,wy-game.player.y);}});
     canvas.addEventListener("pointerdown",e=>{if(e.button===0){canvas.focus();attack(false);}});canvas.addEventListener("contextmenu",e=>e.preventDefault());
     const unlockAudio=()=>{ensureAudio();setMusicTheme(game.scene==="title"?"title":game.scene==="camp"?"camp":BIOME_ART_KEYS[game.biome]);};addEventListener("pointerdown",unlockAudio,{once:true,capture:true});addEventListener("keydown",unlockAudio,{once:true,capture:true});addEventListener("pagehide",()=>{if(game.scene!=="title")saveGame(true);});
-    document.querySelectorAll("#mobile-controls button").forEach(b=>{const code=b.dataset.key;b.addEventListener("pointerdown",e=>{e.preventDefault();game.keys.add(code);if(code==="KeyJ")attack(true);if(code==="Space")dash();if(code==="KeyE")interact();});b.addEventListener("pointerup",()=>game.keys.delete(code));b.addEventListener("pointercancel",()=>game.keys.delete(code));});
+    document.querySelectorAll("#mobile-controls button").forEach(b=>{const code=b.dataset.key;b.addEventListener("pointerdown",e=>{e.preventDefault();game.keys.add(code);if(code==="KeyJ")attack(true);if(code==="KeyR")useActiveSkill(1);if(code==="Space")dash();if(code==="KeyE")interact();});b.addEventListener("pointerup",()=>game.keys.delete(code));b.addEventListener("pointercancel",()=>game.keys.delete(code));});
   }
 
-  setupEvents(); updateHUD(); requestAnimationFrame(loop);
+  function resizeShell(){const shell=$("game-shell"),scale=Math.max(.1,Math.min(innerWidth/W,innerHeight/H)),scaledW=W*scale,scaledH=H*scale;shell.style.left=`${Math.max(0,(innerWidth-scaledW)/2)}px`;shell.style.top=`${Math.max(0,(innerHeight-scaledH)/2)}px`;shell.style.transform=`scale(${scale})`;}
+
+  addEventListener("resize",resizeShell);resizeShell();if(matchMedia("(pointer: coarse)").matches)$("mobile-controls").classList.remove("hidden");setupEvents(); updateHUD(); requestAnimationFrame(loop);
 })();

@@ -24,8 +24,10 @@
 
       <nav class="menu-dock panel-glass" aria-label="游戏功能入口">
         <button id="inventory-btn" class="dock-inventory"><i class="dock-art"></i><span>背包</span><b id="bag-badge">0 / 30</b></button>
-        <button id="skill-dock-btn" class="dock-skills"><i class="dock-art"></i><span>技能</span><b id="sp-badge">0</b></button>
+        <button id="skill-dock-btn" class="dock-skills"><i class="dock-art"></i><span>战技 / 天赋</span><b id="sp-badge">0</b></button>
         <button id="map-dock-btn" class="dock-map"><i class="dock-art"></i><span>星图</span></button>
+        <button id="save-list-btn" class="dock-save"><i class="dock-art"></i><span>存档</span><b>L</b></button>
+        <button id="return-dock-btn" class="dock-return hidden"><i class="dock-art"></i><span>返回营地</span><b>T</b></button>
       </nav>
 
       <div class="world-card panel-glass">
@@ -46,13 +48,14 @@
 
       <div class="quickbar panel-glass">
         <span><kbd>鼠标 / J</kbd> 三段攻击</span>
+        <span><kbd>R</kbd> 武器战技</span>
+        <span><kbd>F</kbd> 星爆术</span>
         <span><kbd>空格</kbd> 闪避</span>
         <span><kbd>Q</kbd> 药水 <b id="potion-text">×3</b></span>
-        <span><kbd>E</kbd> 采集 / 传送</span>
-        <span><kbd>C / I</kbd> 背包</span>
-        <span><kbd>K</kbd> 技能</span>
-        <span><kbd>B</kbd> 铁匠铺</span>
-        <span><kbd>F5 / Ctrl+S</kbd> <b id="save-state">保存</b></span>
+        <span><kbd>E</kbd> 拾取 / 交互</span>
+        <span><kbd>I</kbd> 背包</span>
+        <span><kbd>T</kbd> 回营</span>
+        <span><kbd>L / F5</kbd> <b id="save-state">存档</b></span>
       </div>
     </section>
 
@@ -67,7 +70,7 @@
           <button id="continue-btn">继续存档</button>
         </div>
         <p id="save-meta" class="save-meta">尚无存档</p>
-        <p class="tiny">WASD 移动 · 鼠标左键攻击 · 空格闪避 · F5 / Ctrl+S 快速保存 · 首次点击后启用原创 BGM</p>
+        <p class="tiny">WASD 行走 · 双击方向奔跑 · 鼠标 360° 瞄准 · R/F 主动战技 · F5 快速保存 · 首次点击后启用原创 BGM</p>
       </div>
       <div class="title-seal" aria-hidden="true">✦</div>
     </section>
@@ -100,7 +103,7 @@
           <div class="stats-column">
             <h3>战斗属性</h3>
             <div id="stats-list" class="stats-list"></div>
-            <button id="skills-btn" class="primary full">技能树</button>
+            <button id="skills-btn" class="primary full">战技与天赋星盘</button>
           </div>
           <div class="inventory-column">
             <div class="section-heading"><h3>装备背包</h3><span id="inventory-count">0 / 30</span></div>
@@ -116,9 +119,11 @@
     <section id="skills-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="skills-title">
       <div class="modal-box wide">
         <header class="modal-header">
-          <div><span class="eyebrow">可用技能点 <b id="sp-text">0</b></span><h2 id="skills-title">星灵技能树</h2></div>
+          <div><span class="eyebrow">主动动作与被动成长 · 可用天赋点 <b id="sp-text">0</b></span><h2 id="skills-title">星灵战技与天赋星盘</h2></div>
           <button class="close-btn" data-close="skills-panel" aria-label="关闭">×</button>
         </header>
+        <div id="active-skills" class="active-skills"></div>
+        <h3 class="talent-heading">被动天赋星盘</h3>
         <div id="skill-trees" class="skill-trees"></div>
       </div>
     </section>
@@ -144,7 +149,19 @@
         <h2 id="pause-title">让星火稍作休息</h2>
         <button id="resume-btn" class="primary full">继续游戏</button>
         <button id="save-btn" class="full">立即存档</button>
+        <button id="pause-save-list-btn" class="full">存档列表</button>
         <button id="return-camp-btn" class="full danger">放弃本层并返回营地</button>
+      </div>
+    </section>
+
+    <section id="save-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="save-title">
+      <div class="modal-box wide">
+        <header class="modal-header">
+          <div><span class="eyebrow">自动存档 + 三个手动档位</span><h2 id="save-title">星火存档列表</h2></div>
+          <button class="close-btn" data-close="save-panel" aria-label="关闭">×</button>
+        </header>
+        <p class="modal-lead">F5 / Ctrl+S 写入自动存档。手动档位会保留角色、背包和当前远征位置。</p>
+        <div id="save-slots" class="save-slots"></div>
       </div>
     </section>
 
@@ -166,10 +183,10 @@
         <button data-key="KeyS">▼</button><button data-key="KeyD">▶</button>
       </div>
       <div class="action-pad">
-        <button data-key="KeyE">E</button><button data-key="Space">闪</button><button data-key="KeyJ">斩</button>
+        <button data-key="KeyE">E</button><button data-key="KeyR">技</button><button data-key="Space">闪</button><button data-key="KeyJ">斩</button>
       </div>
     </div>
   </main>
-  <script src="src/game.js" defer></script>
+  <script src="src/game.js?v=20260721-9" defer></script>
 </body>
 </html>
