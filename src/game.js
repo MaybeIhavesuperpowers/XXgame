@@ -42,7 +42,9 @@
     peaks: "assets/sprites/peaks-atlas.png", abyss: "assets/sprites/abyss-atlas.png",
     equipment: "assets/sprites/equipment-atlas.png", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas.png",
     terrain: "assets/sprites/terrain-atlas.png", heroDirectional: "assets/sprites/hero-directional-atlas.png?v=2",
-    eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas.png?v=2"
+    heroRun: "assets/sprites/hero-run-atlas-v2.png?v=3", equipmentLayers: "assets/sprites/hero-equipment-layers-v2.png?v=3",
+    eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas.png?v=2",
+    treantRoots: "assets/sprites/treant-root-vfx-v2.png?v=3", swordWave: "assets/sprites/sword-wave-v2.png?v=3"
   };
   const ART = {};
   Object.entries(SPRITE_PATHS).forEach(([key, src]) => { const img = new Image(); img.src = src; ART[key] = img; });
@@ -682,6 +684,14 @@
 
   function spawnMonsterFx(x,y,col,row,angle=0,size=82,life=.42) { game.impacts.push({x,y,monsterFx:{col,row},size,life,max:life,rotation:angle}); }
 
+  function spawnTreantLineFx(t) {
+    const angle=Math.atan2(t.y2-t.y,t.x2-t.x),length=Math.hypot(t.x2-t.x,t.y2-t.y),segments=Math.max(3,Math.ceil(length/82));
+    for(let i=0;i<segments;i++){
+      const pct=(i+.5)/segments;
+      game.impacts.push({x:lerp(t.x,t.x2,pct),y:lerp(t.y,t.y2,pct),treantFx:true,width:length/segments*1.16,height:56,life:.52+i*.035,max:.52+i*.035,rotation:angle,phase:i});
+    }
+  }
+
   function applyPlayerStatus(status, duration = 2.5) {
     if (!status) return;
     game.player.statuses ||= {};
@@ -881,8 +891,8 @@
     game.telegraphs.push({ type: "circle", x, y, r, life: delay, max: delay, damage, color, status, effect });
   }
 
-  function addLine(x, y, x2, y2, width, delay, damage, color, status = null, effect = 0) {
-    game.telegraphs.push({ type: "line", x, y, x2, y2, width, life: delay, max: delay, damage, color, status, effect });
+  function addLine(x, y, x2, y2, width, delay, damage, color, status = null, effect = 0, specialFx = null) {
+    game.telegraphs.push({ type: "line", x, y, x2, y2, width, life: delay, max: delay, damage, color, status, effect, specialFx });
   }
 
   function addCone(x, y, angle, range, arc, delay, damage, color, status = null, effect = 0) {
@@ -939,18 +949,21 @@
       if(t.type==="circle")hit=Math.hypot(p.x-t.x,p.y-t.y)<t.r+p.radius;
       else if(t.type==="line")hit=pointSegmentDistance(p.x,p.y,t.x,t.y,t.x2,t.y2)<t.width+p.radius;
       else if(t.type==="cone"){const d=Math.hypot(p.x-t.x,p.y-t.y),a=Math.atan2(p.y-t.y,p.x-t.x);hit=d<t.range&&Math.abs(angleDelta(a,t.angle))<t.arc/2;}
-      if(hit&&damagePlayer(t.damage,t.x,t.y))applyPlayerStatus(t.status,t.status==="stun"?.65:2.8);const ix=t.type==="line"?(t.x+t.x2)/2:t.x,iy=t.type==="line"?(t.y+t.y2)/2:t.y;spawnImpact(ix,iy,t.effect||0,t.type==="line"?72:Math.max(46,(t.r||42)*1.25));burst(ix,iy,t.color,12,120);game.screenShake=Math.max(game.screenShake,5);game.telegraphs.splice(i,1);
+      if(hit&&damagePlayer(t.damage,t.x,t.y))applyPlayerStatus(t.status,t.status==="stun"?.65:2.8);
+      const ix=t.type==="line"?(t.x+t.x2)/2:t.x,iy=t.type==="line"?(t.y+t.y2)/2:t.y;
+      if(t.specialFx==="treantRoots")spawnTreantLineFx(t);else spawnImpact(ix,iy,t.effect||0,t.type==="line"?72:Math.max(46,(t.r||42)*1.25));
+      burst(ix,iy,t.color,12,120);game.screenShake=Math.max(game.screenShake,t.specialFx==="treantRoots"?8:5);game.telegraphs.splice(i,1);
     }
   }
 
   function performEnemyAttack(e) {
     const p=game.player,a=e.attack,id=e.pendingAttack||a?.id,tx=e.targetX,ty=e.targetY,dx=tx-e.x,dy=ty-e.y,len=Math.hypot(dx,dy)||1,bonus=Math.floor((game.depth-1)/2);
     const fx={col:game.biome,row:clamp(e.typeIndex||0,0,3)},aim=Math.atan2(dy,dx);
-    const projectile=(effect,status,speed=230,mult=1,homing=0,angleOffset=0)=>{const ang=fx.aim+angleOffset;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(ang),dy:Math.sin(ang),speed,effect,damage:e.damage*mult,status,homing,owner:e,monsterFx:fx});};
-    spawnMonsterFx(e.x+dx/len*34,e.y+dy/len*28,fx.col,fx.row,fx.aim,e.boss?130:82,e.boss?.55:.4);playAttackSfx(id);if(id==="bossMelee"){addCircle(e.x,e.y,e.radius+42,.18,e.damage,"#ff8c68",null,0);}
+    const projectile=(effect,status,speed=230,mult=1,homing=0,angleOffset=0)=>{const ang=aim+angleOffset;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(ang),dy:Math.sin(ang),speed,effect,damage:e.damage*mult,status,homing,owner:e,monsterFx:fx});};
+    spawnMonsterFx(e.x+dx/len*34,e.y+dy/len*28,fx.col,fx.row,aim,e.boss?130:82,e.boss?.55:.4);playAttackSfx(id);if(id==="bossMelee"){addCircle(e.x,e.y,e.radius+42,.18,e.damage,"#ff8c68",null,0);}
     else if(id==="slimeLeap")startCharge(e,tx,ty,275,.48,e.damage,"poison");
     else if(id==="poisonSpore")projectile(5,"poison",155,1,0.15);
-    else if(id==="rootLine")addLine(e.x,e.y,e.x+dx/len*280,e.y+dy/len*280,16,.45,e.damage,"#77c85b","stun",10);
+    else if(id==="rootLine")addLine(e.x,e.y,e.x+dx/len*280,e.y+dy/len*280,18,.52,e.damage,"#77c85b","stun",10,"treantRoots");
     else if(id==="boarCharge")startCharge(e,tx,ty,390,.62,e.damage*1.25,null);
     else if(id==="fireSpit")projectile(6,"burn",225,1);
     else if(id==="tailSting"){if(Math.hypot(p.x-e.x,p.y-e.y)<82&&damagePlayer(e.damage*1.15,e.x,e.y))applyPlayerStatus("poison",3.5);spawnImpact(p.x,p.y,5,42);}
@@ -1096,6 +1109,9 @@
   function drawBiomeObject(col,x,y,size,opts={}){return drawAtlasCell(ART[BIOME_ART_KEYS[game.biome]],col,1,5,2,x,y,size,size,opts);}
   function drawEffect(index,x,y,size,opts={}){return drawAtlasCell(ART.effects,index%5,Math.floor(index/5),5,3,x,y,size,size,opts);}
   function drawMonsterEffect(col,row,x,y,size,opts={}){return drawAtlasCell(ART.monsterEffects,col,row,5,4,x,y,size,size,opts);}
+  function drawEquipmentLayer(col,row,x,y,w,h,opts={}){return drawAtlasCell(ART.equipmentLayers,col,row,5,4,x,y,w,h,opts);}
+  function drawTreantEffect(frame,x,y,w,h,opts={}){return drawAtlasCell(ART.treantRoots,clamp(frame,0,3),0,4,1,x,y,w,h,opts);}
+  function drawSwordWave(x,y,size,opts={}){return drawAtlasCell(ART.swordWave,0,0,1,1,x,y,size,size,opts);}
 
   function drawCamp(time) {
     const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,"#141b2b");grad.addColorStop(1,"#1b211f");ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
@@ -1133,22 +1149,27 @@
   }
 
   function drawPlayer(p, time) {
-    const type=equippedWeaponType(),speed=Math.hypot(p.vx,p.vy),moving=speed>12,row=p.swing?3:p.recoveryPose>0?4:p.running&&moving?2:moving?1:0,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):(Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX)),ax=Math.cos(angle),ay=Math.sin(angle),dirCol=Math.abs(ax)>=Math.abs(ay)?(ax>=0?0:2):(ay>=0?1:3),cycle=p.running?15:moving?9:2.5,bob=p.dash>0?0:Math.sin(time*cycle)*(p.running?3:moving?1.8:1),tilt=moving?Math.sin(time*cycle)*.018:0,equipped=game.save.equipment.equipped;
+    const type=equippedWeaponType(),speed=Math.hypot(p.vx,p.vy),moving=speed>12,row=p.swing?3:p.recoveryPose>0?4:moving?1:0,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):(Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX)),ax=Math.cos(angle),ay=Math.sin(angle),dirCol=Math.abs(ax)>=Math.abs(ay)?(ax>=0?0:2):(ay>=0?1:3),cycle=p.running?12:moving?9:2.5,bob=p.dash>0?0:Math.sin(time*cycle)*(p.running?2.2:moving?1.8:1),tilt=moving?Math.sin(time*cycle)*.014:0,equipped=game.save.equipment.equipped;
     const blinkAlpha=p.invuln>0&&Math.floor(time*18)%2?.46:1;ctx.save();ctx.globalAlpha=blinkAlpha;
     if(equipped.amulet){const c=BIOMES[equipped.amulet.region||0].accent;ctx.globalAlpha=blinkAlpha*(.18+.05*Math.sin(time*5));ctx.fillStyle=c;ctx.beginPath();ctx.arc(p.x,p.y-19,35+Math.sin(time*4)*2,0,Math.PI*2);ctx.fill();ctx.globalAlpha=blinkAlpha;}
-    drawAtlasCell(ART.heroDirectional,dirCol,row,4,5,p.x,p.y-22+bob,82,102,{rotation:tilt,filter:p.hurtFx>0?"brightness(1.6) saturate(.65)":"none"});
-    if(equipped.boots){const c=equipmentCoords(equipped.boots);drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x,p.y+10+bob,31,31,{alpha:.68});}
-    if(equipped.armor){const c=equipmentCoords(equipped.armor);drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x,p.y-20+bob,44,44,{alpha:.55});}
-    if(equipped.helmet){const c=equipmentCoords(equipped.helmet);drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x,p.y-48+bob,32,32,{alpha:.8});}
-    if(equipped.weapon){const c=equipmentCoords(equipped.weapon),weaponSize=type==="spear"?50:type==="axe"?48:43;drawAtlasCell(ART.equipment,c.col,c.row,5,5,p.x+ax*27,p.y-17+ay*25+bob,weaponSize,weaponSize,{rotation:angle+Math.PI/4,alpha:.96});}
-    if(p.swing){const effectSize=(type==="axe"?105:type==="spear"?82:type==="staff"?72:76)+(p.swing.combo===3?18:0),offset={sword:0,spear:Math.PI/4,axe:0,staff:Math.PI/4,daggers:2.5}[type]||0;drawEffect(WEAPON_TYPES.indexOf(type),p.x+ax*39,p.y+ay*34,effectSize,{rotation:angle+offset,alpha:.78});}
+    const bodyOpts={rotation:tilt,filter:p.hurtFx>0?"brightness(1.6) saturate(.65)":"none"};
+    if(p.running&&moving&&!p.swing&&p.recoveryPose<=0)drawAtlasCell(ART.heroRun,dirCol,Math.floor(time*12)%4,4,4,p.x,p.y-22+bob,82,102,bodyOpts);
+    else drawAtlasCell(ART.heroDirectional,dirCol,row,4,5,p.x,p.y-22+bob,82,102,bodyOpts);
+    const layerFlip=dirCol===2,backAlpha=dirCol===3?.76:1;
+    if(equipped.boots){const c=equipmentCoords(equipped.boots);drawEquipmentLayer(c.col,2,p.x,p.y+9+bob,35,35,{alpha:.88*backAlpha,flip:layerFlip});}
+    if(equipped.armor){const c=equipmentCoords(equipped.armor);drawEquipmentLayer(c.col,1,p.x,p.y-21+bob,48,45,{alpha:.9*backAlpha,flip:layerFlip});}
+    if(equipped.helmet){const c=equipmentCoords(equipped.helmet);drawEquipmentLayer(c.col,0,p.x,p.y-47+bob,35,34,{alpha:.94*backAlpha,flip:layerFlip});}
+    if(equipped.amulet&&dirCol!==3){const c=equipmentCoords(equipped.amulet);drawEquipmentLayer(c.col,3,p.x+(dirCol===0?5:dirCol===2?-5:0),p.y-28+bob,18,18,{alpha:.96,flip:layerFlip});}
+    const swingProgress=p.swing?clamp(1-p.swing.t/p.swing.max,0,1):.5,swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,swingProgress):0,weaponAngle=angle+swingArc,wax=Math.cos(weaponAngle),way=Math.sin(weaponAngle),socket=[{x:15,y:-23},{x:8,y:-19},{x:-15,y:-23},{x:7,y:-27}][dirCol],handX=p.x+socket.x,handY=p.y+socket.y+bob,gripDistance={sword:18,spear:24,axe:19,staff:23,daggers:14}[type]||18,weaponSize=type==="spear"?50:type==="axe"?48:43,weaponX=handX+wax*gripDistance,weaponY=handY+way*gripDistance;
+    if(p.swing){const effectSize=(type==="axe"?105:type==="spear"?82:type==="staff"?72:76)+(p.swing.combo===3?18:0),effectDistance=gripDistance+weaponSize*.34,effectX=handX+wax*effectDistance,effectY=handY+way*effectDistance,offset={spear:Math.PI/4,axe:0,staff:Math.PI/4,daggers:2.5}[type]||0;if(type==="sword")drawSwordWave(effectX,effectY,effectSize,{rotation:weaponAngle,alpha:.82});else drawEffect(WEAPON_TYPES.indexOf(type),effectX,effectY,effectSize,{rotation:weaponAngle+offset,alpha:.78});drawEffect(10,handX,handY,19+(p.swing.combo===3?5:0),{rotation:weaponAngle,alpha:.58});}
+    if(equipped.weapon){const c=equipmentCoords(equipped.weapon),weaponRotation={sword:Math.PI/4,spear:Math.PI/4,axe:Math.PI*.75,staff:Math.PI/3,daggers:Math.PI/4}[type]||Math.PI/4;drawAtlasCell(ART.equipment,c.col,c.row,5,5,weaponX,weaponY,weaponSize,weaponSize,{rotation:weaponAngle+weaponRotation,alpha:.98});}
     ctx.restore();
     const statuses=Object.keys(p.statuses||{});statuses.forEach((s,i)=>{const idx={burn:11,slow:12,poison:13,stun:14,charm:9}[s];drawEffect(idx,p.x-18+i*12,p.y-55,25,{alpha:.82});});
   }
 
-  function drawTelegraph(t){const pct=1-t.life/t.max;ctx.save();ctx.globalAlpha=.16+pct*.48;ctx.fillStyle=t.color;ctx.strokeStyle=t.color;ctx.lineWidth=3;if(t.type==="circle"){ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(t.x,t.y,t.r*(.2+pct*.8),0,Math.PI*2);ctx.stroke();}else if(t.type==="line"){ctx.lineWidth=t.width*2;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();ctx.globalAlpha=.9;ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();}else{ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.arc(t.x,t.y,t.range,t.angle-t.arc/2,t.angle+t.arc/2);ctx.closePath();ctx.fill();}ctx.restore();}
+  function drawTelegraph(t){const pct=1-t.life/t.max;ctx.save();ctx.globalAlpha=.16+pct*.48;ctx.fillStyle=t.color;ctx.strokeStyle=t.color;ctx.lineWidth=3;if(t.type==="circle"){ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(t.x,t.y,t.r*(.2+pct*.8),0,Math.PI*2);ctx.stroke();}else if(t.type==="line"){ctx.lineWidth=t.width*2;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();ctx.globalAlpha=.9;ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();if(t.specialFx==="treantRoots"){ctx.setLineDash([]);const angle=Math.atan2(t.y2-t.y,t.x2-t.x),length=Math.hypot(t.x2-t.x,t.y2-t.y),segments=Math.max(3,Math.ceil(length/88)),frame=Math.min(3,Math.floor(pct*4));for(let i=0;i<segments;i++){const q=(i+.5)/segments;drawTreantEffect(frame,lerp(t.x,t.x2,q),lerp(t.y,t.y2,q),length/segments*1.15,45+pct*14,{rotation:angle,alpha:.38+pct*.44});}}}else{ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.arc(t.x,t.y,t.range,t.angle-t.arc/2,t.angle+t.arc/2);ctx.closePath();ctx.fill();}ctx.restore();}
   function drawProjectile(q){const a=Math.atan2(q.vy,q.vx);if(q.monsterFx)drawMonsterEffect(q.monsterFx.col,q.monsterFx.row,q.x,q.y,q.radius*5.6,{rotation:a,alpha:.96});else drawEffect(q.effect,q.x,q.y,q.radius*3.8,{rotation:a+(q.team==="player"&&q.effect===3?Math.PI/4:0),alpha:.96});}
-  function drawImpactFx(f){const pct=1-f.life/f.max;if(f.monsterFx)drawMonsterEffect(f.monsterFx.col,f.monsterFx.row,f.x,f.y,f.size*(.65+pct*.55),{rotation:f.rotation,alpha:1-pct});else drawEffect(f.effect,f.x,f.y,f.size*(.55+pct*.65),{rotation:f.rotation,alpha:1-pct});}
+  function drawImpactFx(f){const pct=1-f.life/f.max;if(f.treantFx)drawTreantEffect(Math.min(3,Math.floor(pct*4)),f.x,f.y,f.width,f.height*(.7+pct*.3),{rotation:f.rotation,alpha:1-pct*.72});else if(f.monsterFx)drawMonsterEffect(f.monsterFx.col,f.monsterFx.row,f.x,f.y,f.size*(.65+pct*.55),{rotation:f.rotation,alpha:1-pct});else drawEffect(f.effect,f.x,f.y,f.size*(.55+pct*.65),{rotation:f.rotation,alpha:1-pct});}
 
   function drawGroundDrop(d,time){d.life=(d.life||0)+1/60;const bob=Math.sin(time*4+d.x*.02)*3,pulse=.78+.2*Math.sin(time*5+d.y*.03);ctx.save();ctx.globalAlpha=.2+pulse*.12;ctx.fillStyle=d.kind==="equipment"?qualityById(d.item.quality).color:d.kind==="potion"?"#79ef91":BIOMES[game.biome].accent;ctx.beginPath();ctx.ellipse(d.x,d.y+11,25,9,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(d.kind==="equipment"){const c=equipmentCoords(d.item);drawAtlasCell(ART.equipment,c.col,c.row,5,5,d.x,d.y-8+bob,48,48);ctx.strokeStyle=qualityById(d.item.quality).color;ctx.strokeRect(d.x-20,d.y-28+bob,40,40);}else if(d.kind==="potion")drawAtlasCell(ART.eliteLoot,game.biome,1,5,2,d.x,d.y-7+bob,46,46);else{const c=materialCoords(d.material);drawAtlasCell(ART.materials,c.col,c.row,5,4,d.x,d.y-7+bob,44,44);}ctx.restore();}
 
@@ -1290,8 +1311,10 @@
   }
 
   function moveTooltip(e) {
-    const tip = $("tooltip"), pad = 15; let x = e.clientX + pad, y = e.clientY + pad;
-    if (x + 250 > innerWidth) x = e.clientX - 255; if (y + tip.offsetHeight > innerHeight) y = e.clientY - tip.offsetHeight - 10;
+    const tip=$("tooltip"),shell=$("game-shell"),rect=shell.getBoundingClientRect(),scale=rect.width/W||1,pad=7,mouseX=(e.clientX-rect.left)/scale,mouseY=(e.clientY-rect.top)/scale,tipWidth=tip.offsetWidth||240,tipHeight=tip.offsetHeight||180;
+    let x=mouseX+pad,y=mouseY+pad;
+    if(x+tipWidth>W-6)x=mouseX-tipWidth-pad;if(y+tipHeight>H-6)y=mouseY-tipHeight-pad;
+    x=clamp(x,6,W-tipWidth-6);y=clamp(y,6,H-tipHeight-6);
     tip.style.left = `${x}px`; tip.style.top = `${y}px`;
   }
 
@@ -1302,7 +1325,7 @@
       const item = game.save.equipment.equipped[slot]; const node = document.createElement("div"); node.dataset.slot = slot; node.className = `equipment-slot ${item ? `quality-${item.quality}` : "empty"}`; node.innerHTML = item ? `${itemArtHTML(item)}<b>${item.name}</b><span>${item.main.type === "attack" ? "攻" : item.main.type === "defense" ? "防" : "命"} ${itemMainValue(item)}</span>` : `<span>${label}</span>`;
       if (item) { bindItemTooltip(node,item); node.addEventListener("click",()=>unequip(slot)); } equipment.append(node);
     });
-    const doll = $("paperdoll-hero"); if (doll) doll.style.setProperty("--weapon-col", WEAPON_TYPES.indexOf(equippedWeaponType()));
+    const doll = $("paperdoll-hero"); if (doll) {doll.style.setProperty("--weapon-col",WEAPON_TYPES.indexOf(equippedWeaponType()));const layers=[["helmet",0],["armor",1],["boots",2],["amulet",3]];if(!doll.querySelector(".doll-layer"))doll.innerHTML=layers.map(([slot,row])=>`<i class="doll-layer doll-${slot}" data-doll-slot="${slot}" style="--layer-row:${row}"></i>`).join("");layers.forEach(([slot])=>{const layer=doll.querySelector(`[data-doll-slot="${slot}"]`),item=game.save.equipment.equipped[slot];layer.classList.toggle("hidden",!item);if(item)layer.style.setProperty("--layer-col",clamp(item.region??0,0,4));});}
     const st = stats(); const rows = [
       ["攻击力",fmt(st.attack)],["防御力",fmt(st.defense)],["最大生命",fmt(st.maxHp)],["暴击率",formatStat("critRate",st.critRate)],
       ["暴击伤害",formatStat("critDamage",st.critDamage)],["攻击速度",formatStat("attackSpeed",st.attackSpeed-1)],["闪避率",formatStat("dodge",st.dodge)],

@@ -129,6 +129,11 @@ button.danger { color: #ffd8d8; border-color: #80444a; background: linear-gradie
 .character-layout > div { min-width: 0; padding: 15px; background: rgba(0,0,0,.16); border: 1px solid var(--line); }
 .paperdoll { position: relative; min-height: 355px; display: grid; place-items: center; background: radial-gradient(circle,#364052 0,#161722 60%,#101019 100%); border: 1px solid #454150; }
 .pixel-hero { position: relative; width: 112px; height: 150px; background: url("assets/sprites/hero-atlas.png") calc(var(--weapon-col,0) * 25%) 0 / 500% 300% no-repeat; image-rendering:pixelated; filter: drop-shadow(0 8px 2px #050509); }
+.doll-layer { position:absolute;z-index:2;display:block;background-image:url("assets/sprites/hero-equipment-layers-v2.png?v=3");background-position:calc(var(--layer-col,0) * 25%) calc(var(--layer-row,0) * 33.333%);background-size:500% 400%;background-repeat:no-repeat;image-rendering:pixelated;filter:drop-shadow(0 2px 1px #050509);pointer-events:none; }
+.doll-helmet { width:48px;height:46px;left:32px;top:8px; }
+.doll-armor { width:66px;height:64px;left:23px;top:49px;opacity:.94; }
+.doll-boots { width:50px;height:48px;left:31px;top:101px; }
+.doll-amulet { width:24px;height:24px;left:44px;top:53px;z-index:3; }
 .equipment-slot { position:absolute; width:64px; height:68px; display:grid;grid-template-columns:34px 1fr;place-items:center; background:#15151e; border:2px solid #4b4652; cursor:pointer; font-size:8px;text-align:center;padding:3px; }
 .equipment-slot[data-slot="helmet"]{top:15px;right:15px}.equipment-slot[data-slot="weapon"]{top:92px;left:12px}.equipment-slot[data-slot="armor"]{top:92px;right:12px}.equipment-slot[data-slot="boots"]{bottom:15px;left:12px}.equipment-slot[data-slot="amulet"]{bottom:15px;right:12px}
 .equipment-slot.empty { color:#706a75; }
@@ -194,7 +199,7 @@ button.danger { color: #ffd8d8; border-color: #80444a; background: linear-gradie
 .save-slot-actions { display:flex;gap:7px; }
 .save-slot-actions button { padding:8px 12px;font-size:10px; }
 
-.tooltip { position:fixed;z-index:60;pointer-events:none;width:240px;padding:12px;background:#0d0d14;border:2px solid #746879;box-shadow:0 6px 20px #000;color:#d9d1c2;font-size:11px;line-height:1.55; }
+.tooltip { position:absolute;z-index:60;pointer-events:none;width:240px;max-height:706px;overflow:hidden;padding:12px;background:#0d0d14;border:2px solid #746879;box-shadow:0 6px 20px #000;color:#d9d1c2;font-size:11px;line-height:1.55; }
 .tooltip h4 { margin:0 0 7px;font-size:14px; }
 .tooltip-top { display:flex;align-items:center;gap:8px; }
 .tooltip-art { width:58px;height:58px;flex:none; }
