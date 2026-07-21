@@ -40,6 +40,31 @@
     peaks: { tempo: 124, wave: "square", lead: [57,64,60,67,62,69,64,60], bass: [33,40,36,38], color: .13 },
     abyss: { tempo: 64, wave: "sawtooth", lead: [45,46,52,51,45,41,40,46], bass: [28,29,33,27], color: .12 }
   };
+  const STAGE_MUSIC_KEYS = ["forest","waste","tundra","peaks","abyss"];
+  const STAGE_TRACK_NAMES = [
+    ["雾灯序曲","孢子回声","根脉低语","兽径追猎","古木王庭"],
+    ["赤沙行军","熔炉余烬","蝎影残阳","焚风围猎","骨龙天火"],
+    ["初雪无声","冰湖月影","狼群长夜","极光挽歌","寒冠王座"],
+    ["远雷将至","断崖风歌","云海电鸣","天穹裂阵","雷神领域"],
+    ["暮色边界","虚空脉搏","魅影回廊","混沌凝视","终焉魔域"]
+  ];
+  const DEPTH_MUSIC_VARIANTS = [
+    { tempo:-4, transpose:0, rotate:0, pulse:[1,0,0,0,1,0,0,0] },
+    { tempo:2, transpose:2, rotate:2, pulse:[1,0,1,0,1,0,0,1] },
+    { tempo:7, transpose:-2, rotate:4, pulse:[1,0,0,1,1,0,1,0] },
+    { tempo:12, transpose:3, rotate:1, pulse:[1,1,0,1,1,0,1,0] },
+    { tempo:17, transpose:-5, rotate:3, pulse:[1,0,1,1,1,0,1,1] }
+  ];
+
+  function stageMusicKey(biome,depth){return `${STAGE_MUSIC_KEYS[clamp(biome,0,4)]}-${clamp(depth,1,5)}`;}
+  function resolveMusicTheme(name){
+    if(MUSIC_THEMES[name])return {...MUSIC_THEMES[name],key:name,biomeKey:name,depth:0,trackName:name==="title"?"五域远征":name==="camp"?"星火余烬":name};
+    const match=/^(forest|waste|tundra|peaks|abyss)-(\d)$/.exec(name||"");if(!match)return resolveMusicTheme("title");
+    const biome=STAGE_MUSIC_KEYS.indexOf(match[1]),depth=clamp(Number(match[2]),1,5),base=MUSIC_THEMES[match[1]],variant=DEPTH_MUSIC_VARIANTS[depth-1],rotate=variant.rotate%base.lead.length;
+    const lead=base.lead.slice(rotate).concat(base.lead.slice(0,rotate)).map((note,i)=>note+variant.transpose+(depth>=4&&i%4===3?2:0));
+    const bass=base.bass.map((note,i)=>note+Math.round(variant.transpose/2)+(depth===5&&i%2?-2:0));
+    return {...base,key:name,biomeKey:match[1],depth,tempo:base.tempo+variant.tempo+biome*2,lead,bass,pulse:variant.pulse,trackName:STAGE_TRACK_NAMES[biome][depth-1]};
+  }
 
   const SPRITE_PATHS = {
     hero: "assets/sprites/hero-atlas.png", forest: "assets/sprites/forest-atlas.png",
@@ -412,7 +437,7 @@
     try {
       if (!game.audio?.ctx) {
         const ctx = new (window.AudioContext || window.webkitAudioContext)(), master=ctx.createGain(),music=ctx.createGain(),sfx=ctx.createGain();
-        master.gain.value=.72;music.gain.value=.34;sfx.gain.value=.78;music.connect(master);sfx.connect(master);master.connect(ctx.destination);
+        master.gain.value=.72;music.gain.value=.58;sfx.gain.value=.78;music.connect(master);sfx.connect(master);master.connect(ctx.destination);
         game.audio={ctx,master,music,sfx,musicTimer:null,theme:null,step:0};
       }
       if(game.audio.ctx.state==="suspended")game.audio.ctx.resume();
@@ -429,14 +454,21 @@
     const a=game.audio?.ctx?game.audio:ensureAudio();if(!a)return;const length=Math.max(1,Math.floor(a.ctx.sampleRate*duration)),buffer=a.ctx.createBuffer(1,length,a.ctx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*(1-i/length);const src=a.ctx.createBufferSource(),g=a.ctx.createGain();src.buffer=buffer;g.gain.value=gain;src.connect(g);g.connect(a[channel]);src.start();
   }
 
-  function musicAccent(name,step,now,beat){if(step%8!==4)return;if(name==="title")synthTone(midiFreq(76),beat*2,"sine",.012,now,"music",1.5);else if(name==="camp")synthTone(midiFreq(71),beat*1.7,"triangle",.013,now,"music",.75);else if(name==="forest")synthTone(midiFreq(82+(step%3)),beat*.45,"sine",.01,now,"music",1.3);else if(name==="waste"){noiseBurst(.11,.009,"music");synthTone(68,beat*.7,"square",.014,now,"music",.62);}else if(name==="tundra")synthTone(midiFreq(88),beat*2.2,"sine",.014,now,"music",.5);else if(name==="peaks"){noiseBurst(.06,.014,"music");synthTone(1380,beat*.3,"square",.009,now,"music",.28);}else if(name==="abyss"){synthTone(52,beat*3,"sawtooth",.012,now,"music",.72);synthTone(55,beat*3,"sine",.009,now,"music",.68);}}
-
-  function startMusic(name) {
-    game.musicTheme=name;const a=game.audio?.ctx?game.audio:null;if(!a)return;if(a.musicTimer)clearTimeout(a.musicTimer);a.theme=name;a.step=0;
-    const tick=()=>{if(!game.audio||game.audio.theme!==name)return;const theme=MUSIC_THEMES[name],beat=60/theme.tempo/2,step=a.step++,now=a.ctx.currentTime+.02,lead=theme.lead[step%theme.lead.length],bass=theme.bass[Math.floor(step/2)%theme.bass.length];synthTone(midiFreq(lead),beat*.82,theme.wave,.022*theme.color/0.2,now,"music");if(step%2===0)synthTone(midiFreq(bass),beat*1.7,name==="abyss"?"sawtooth":"triangle",.017,now,"music");if(step%4===2&&["waste","peaks"].includes(name))noiseBurst(.055,.006,"music");musicAccent(name,step,now,beat);a.musicTimer=setTimeout(tick,beat*1000);};tick();
+  function synthPad(notes,duration,wave="sine",gain=.009,when=null){
+    const a=game.audio?.ctx?game.audio:ensureAudio();if(!a)return;const start=when??a.ctx.currentTime,attack=Math.min(.7,duration*.18),release=Math.min(1.2,duration*.28);
+    notes.forEach((note,i)=>{const osc=a.ctx.createOscillator(),g=a.ctx.createGain(),detune=(i-1)*4;osc.type=wave;osc.frequency.value=midiFreq(note);osc.detune.value=detune;g.gain.setValueAtTime(.0001,start);g.gain.exponentialRampToValueAtTime(Math.max(.0002,gain),start+attack);g.gain.setValueAtTime(Math.max(.0002,gain*.82),Math.max(start+attack,start+duration-release));g.gain.exponentialRampToValueAtTime(.0001,start+duration);osc.connect(g);g.connect(a.music);osc.start(start);osc.stop(start+duration+.03);});
   }
 
-  function setMusicTheme(name){game.musicTheme=name;if(game.audio?.ctx)startMusic(name);}
+  function musicAccent(theme,step,now,beat){if(step%8!==4)return;const name=theme.biomeKey,depth=theme.depth||0;if(name==="title")synthTone(midiFreq(76),beat*2,"sine",.014,now,"music",1.5);else if(name==="camp")synthTone(midiFreq(71),beat*1.7,"triangle",.015,now,"music",.75);else if(name==="forest")synthTone(midiFreq(80+depth),beat*.7,"sine",.012,now,"music",1.3);else if(name==="waste"){noiseBurst(.11,.008+depth*.001,"music");synthTone(68+depth*5,beat*.8,"square",.012,now,"music",.62);}else if(name==="tundra")synthTone(midiFreq(86+depth),beat*2.2,"sine",.014,now,"music",.5);else if(name==="peaks"){noiseBurst(.06,.011+depth*.001,"music");synthTone(1260+depth*55,beat*.34,"square",.008,now,"music",.28);}else if(name==="abyss"){synthTone(48+depth*2,beat*3,"sawtooth",.011,now,"music",.72);synthTone(53+depth,beat*3,"sine",.008,now,"music",.68);}}
+
+  function startMusic(name) {
+    game.musicTheme=name;const a=game.audio?.ctx?game.audio:null;if(!a)return;if(a.musicTimer)clearTimeout(a.musicTimer);a.theme=name;a.step=0;const theme=resolveMusicTheme(name);document.documentElement.dataset.bgmTrack=theme.trackName;document.documentElement.dataset.bgmKey=name;
+    const tick=()=>{if(!game.audio||game.audio.theme!==name)return;document.documentElement.dataset.bgmState=a.ctx.state;if(a.ctx.state!=="running"){a.musicTimer=setTimeout(tick,250);return;}const beat=60/theme.tempo/2,step=a.step++,now=a.ctx.currentTime+.035,lead=theme.lead[step%theme.lead.length],bass=theme.bass[Math.floor(step/2)%theme.bass.length],pulse=theme.pulse?.[step%theme.pulse.length]??1;document.documentElement.dataset.bgmStep=String(step);
+      if(step%8===0){const root=theme.bass[Math.floor(step/8)%theme.bass.length]+12,chord=theme.depth===5?[root,root+3,root+7]:[root,root+4,root+7];synthPad(chord,beat*8.6,theme.biomeKey==="abyss"?"triangle":"sine",theme.depth===5?.011:.0095,now);}
+      synthTone(midiFreq(lead),beat*.9,theme.wave,(.018+theme.color*.025)*(pulse?.95:.58),now,"music");if(step%2===0)synthTone(midiFreq(bass),beat*1.9,theme.biomeKey==="abyss"?"sawtooth":"triangle",.015+(theme.depth||0)*.0008,now,"music");if(pulse&&step%4===2&&["waste","peaks"].includes(theme.biomeKey))noiseBurst(.05,.0055,"music");musicAccent(theme,step,now,beat);a.musicTimer=setTimeout(tick,beat*1000);};tick();
+  }
+
+  function setMusicTheme(name){game.musicTheme=name;if(game.audio?.ctx&&game.audio.theme!==name)startMusic(name);}
 
   function playSfx(name) {
     if(!ensureAudio())return;const now=game.audio.ctx.currentTime;
@@ -556,7 +588,7 @@
     game.resources=(session.resources||[]).map(r=>({...r}));game.altars=(session.altars||[]).map(a=>({...a}));game.groundDrops=(session.groundDrops||[]).map(d=>({...d}));game.telegraphs=[];game.projectiles=[];game.impacts=[];game.particles=[];game.numbers=[];game.camera.x=game.camera.y=0;
     const floorCleared=depth<5&&!game.enemies.some(e=>!e.dead&&!e.boss),bossCleared=depth===5&&!game.enemies.some(e=>!e.dead&&e.boss);
     if(!game.world.exitSpawned&&(floorCleared||bossCleared))spawnExitNearPlayer(false);
-    $("title-screen").classList.add("hidden");$("death-panel").classList.add("hidden");$("hud").classList.remove("hidden");closeAllModals();setMusicTheme(BIOME_ART_KEYS[biome]);updateCamera(1);updateHUD();
+    $("title-screen").classList.add("hidden");$("death-panel").classList.add("hidden");$("hud").classList.remove("hidden");closeAllModals();setMusicTheme(stageMusicKey(biome,depth));updateCamera(1);updateHUD();
   }
 
   function enterCamp(first = false) {
@@ -651,7 +683,7 @@
       for (let i = 0; i < 3; i++) { const p = pickCell(7); game.altars.push({ x: (p.x + .5) * TILE, y: (p.y + .5) * TILE, lit: false }); }
     }
     game.save.player.hp = Math.min(game.save.player.hp, stats().maxHp);
-    setMusicTheme(BIOME_ART_KEYS[biomeIndex]);playSfx("portal");
+    setMusicTheme(stageMusicKey(biomeIndex,depth));playSfx("portal");
     closeAllModals(); updateHUD(); toast(`${biome.name} · 深度 ${depth}`, biome.accent); saveGame(true);
   }
 
@@ -1295,7 +1327,7 @@
       $("area-name").textContent = "星火营地"; $("depth-text").textContent = "安全区 · 可自由移动"; $("explore-text").textContent="探索 100%"; $("quest-text").textContent = "WASD 在营地移动；按 M 选择远征，按 B 打造装备";
       $("boss-wrap").classList.add("hidden"); return;
     }
-    const b = BIOMES[game.biome],explored=explorationPercent(); $("area-name").textContent = b.name; $("depth-text").textContent = `深度 ${game.depth} / 5`;$("explore-text").textContent=`探索 ${explored}%`;
+    const b = BIOMES[game.biome],explored=explorationPercent(),track=STAGE_TRACK_NAMES[game.biome][game.depth-1]; $("area-name").textContent = b.name; $("depth-text").textContent = `深度 ${game.depth} / 5 · ♫ ${track}`;$("explore-text").textContent=`探索 ${explored}%`;
     const boss = game.enemies.find(e => e.boss && !e.dead);
     if (boss) {
       $("boss-wrap").classList.remove("hidden"); $("boss-name").textContent = boss.name; $("boss-fill").style.width = `${Math.max(0,boss.hp / boss.maxHp * 100)}%`;
@@ -1501,7 +1533,7 @@
     addEventListener("keydown",handleKeyDown);addEventListener("keyup",e=>{game.keys.delete(e.code);if(game.player.runKey===e.code){game.player.runKey=null;game.player.running=false;}});addEventListener("blur",()=>{game.keys.clear();game.player.running=false;});
     canvas.addEventListener("pointermove",e=>{const r=canvas.getBoundingClientRect();game.mouse.x=(e.clientX-r.left)/r.width*W;game.mouse.y=(e.clientY-r.top)/r.height*H;if(game.scene!=="title"&&!game.player.swing){const wx=game.mouse.x+game.camera.x,wy=game.mouse.y+game.camera.y;setPlayerAim(wx-game.player.x,wy-game.player.y);}});
     canvas.addEventListener("pointerdown",e=>{if(e.button===0){canvas.focus();attack(false);}});canvas.addEventListener("contextmenu",e=>e.preventDefault());
-    const unlockAudio=()=>{ensureAudio();setMusicTheme(game.scene==="title"?"title":game.scene==="camp"?"camp":BIOME_ART_KEYS[game.biome]);};addEventListener("pointerdown",unlockAudio,{once:true,capture:true});addEventListener("keydown",unlockAudio,{once:true,capture:true});addEventListener("pagehide",()=>{if(game.scene!=="title")saveGame(true);});
+    const currentMusicKey=()=>game.scene==="title"?"title":game.scene==="camp"?"camp":stageMusicKey(game.biome,game.depth),unlockAudio=()=>{ensureAudio();setMusicTheme(currentMusicKey());};addEventListener("pointerdown",unlockAudio,{once:true,capture:true});addEventListener("keydown",unlockAudio,{once:true,capture:true});addEventListener("focus",()=>{if(game.audio?.ctx){ensureAudio();if(game.audio.theme!==currentMusicKey())startMusic(currentMusicKey());}});addEventListener("pagehide",()=>{if(game.scene!=="title")saveGame(true);});
     document.querySelectorAll("#mobile-controls button").forEach(b=>{const code=b.dataset.key;b.addEventListener("pointerdown",e=>{e.preventDefault();game.keys.add(code);if(code==="KeyJ")attack(true);if(code==="KeyR")useActiveSkill(1);if(code==="Space")dash();if(code==="KeyE")interact();});b.addEventListener("pointerup",()=>game.keys.delete(code));b.addEventListener("pointercancel",()=>game.keys.delete(code));});
   }
 
