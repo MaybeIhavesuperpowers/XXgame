@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0b0b14">
+  <title>像素纪元：五域远征</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="game-shell" aria-label="像素纪元：五域远征游戏区域">
+    <canvas id="game" width="1280" height="720" tabindex="0" aria-label="游戏画面"></canvas>
+
+    <section id="hud" class="hidden" aria-live="polite">
+      <div class="player-card panel-glass">
+        <div class="portrait" aria-hidden="true"></div>
+        <div class="status-stack">
+          <div class="hud-row"><strong id="hud-level">LV.1</strong><span id="hud-name">失忆的星灵使者</span></div>
+          <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
+          <div class="bar stamina"><i id="stamina-fill"></i><span id="stamina-text">100 / 100</span></div>
+          <div class="bar xp"><i id="xp-fill"></i><span id="xp-text">0 / 100</span></div>
+        </div>
+      </div>
+
+      <nav class="menu-dock panel-glass" aria-label="游戏功能入口">
+        <button id="inventory-btn" class="dock-inventory"><i class="dock-art"></i><span>背包</span><b id="bag-badge">0 / 30</b></button>
+        <button id="skill-dock-btn" class="dock-skills"><i class="dock-art"></i><span>技能</span><b id="sp-badge">0</b></button>
+        <button id="map-dock-btn" class="dock-map"><i class="dock-art"></i><span>星图</span></button>
+      </nav>
+
+      <div class="world-card panel-glass">
+        <canvas id="minimap" width="150" height="96" aria-label="迷你地图"></canvas>
+        <div><strong id="area-name">星火营地</strong><span id="depth-text">安全区</span></div>
+        <div class="currencies"><span>◉ <b id="gold-text">0</b></span><span>✧ <b id="void-text">0</b></span></div>
+      </div>
+
+      <div id="boss-wrap" class="boss-wrap hidden">
+        <strong id="boss-name">巨木守卫</strong>
+        <div class="boss-bar"><i id="boss-fill"></i></div>
+      </div>
+
+      <div id="quest-card" class="quest-card panel-glass">
+        <span class="eyebrow">当前目标</span>
+        <strong id="quest-text">在营地选择远征大陆</strong>
+      </div>
+
+      <div class="quickbar panel-glass">
+        <span><kbd>鼠标 / J</kbd> 三段攻击</span>
+        <span><kbd>空格</kbd> 闪避</span>
+        <span><kbd>Q</kbd> 药水 <b id="potion-text">×3</b></span>
+        <span><kbd>E</kbd> 采集 / 传送</span>
+        <span><kbd>C / I</kbd> 背包</span>
+        <span><kbd>K</kbd> 技能</span>
+        <span><kbd>B</kbd> 铁匠铺</span>
+        <span><kbd>F5 / Ctrl+S</kbd> <b id="save-state">保存</b></span>
+      </div>
+    </section>
+
+    <section id="title-screen" class="overlay title-screen">
+      <div class="title-vignette"></div>
+      <div class="title-content">
+        <p class="eyebrow">五枚失控核心 · 二十五层远征</p>
+        <h1>像素纪元<br><span>五域远征</span></h1>
+        <p class="tagline">从一把破旧铁剑开始，穿越迷雾、熔火、冰原、雷峰与深渊。</p>
+        <div class="title-actions">
+          <button id="new-game-btn" class="primary">踏上远征</button>
+          <button id="continue-btn">继续存档</button>
+        </div>
+        <p id="save-meta" class="save-meta">尚无存档</p>
+        <p class="tiny">WASD 移动 · 鼠标左键攻击 · 空格闪避 · F5 / Ctrl+S 快速保存 · 首次点击后启用原创 BGM</p>
+      </div>
+      <div class="title-seal" aria-hidden="true">✦</div>
+    </section>
+
+    <section id="continent-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="continent-title">
+      <div class="modal-box wide">
+        <header class="modal-header">
+          <div><span class="eyebrow">星门航图</span><h2 id="continent-title">选择远征大陆</h2></div>
+          <button class="close-btn" data-close="continent-panel" aria-label="关闭">×</button>
+        </header>
+        <p class="modal-lead">每片大陆包含 5 个连续深度。阵亡会返回营地，但资源、装备与成长永久保留。</p>
+        <div id="continent-grid" class="continent-grid"></div>
+      </div>
+    </section>
+
+    <section id="character-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="character-title">
+      <div class="modal-box extra-wide">
+        <header class="modal-header">
+          <div><span class="eyebrow">星灵档案</span><h2 id="character-title">角色与背包</h2></div>
+          <button class="close-btn" data-close="character-panel" aria-label="关闭">×</button>
+        </header>
+        <div class="character-layout">
+          <div class="equipment-column">
+            <h3>已装备</h3>
+            <div class="paperdoll">
+              <div id="paperdoll-hero" class="pixel-hero" aria-hidden="true"></div>
+              <div id="equipment-slots" class="equipment-slots"></div>
+            </div>
+          </div>
+          <div class="stats-column">
+            <h3>战斗属性</h3>
+            <div id="stats-list" class="stats-list"></div>
+            <button id="skills-btn" class="primary full">技能树</button>
+          </div>
+          <div class="inventory-column">
+            <div class="section-heading"><h3>装备背包</h3><span id="inventory-count">0 / 30</span></div>
+            <p class="hint">点击装备进行穿戴；旧装备会自动放回背包。</p>
+            <div id="inventory-grid" class="inventory-grid"></div>
+            <h3>远征材料</h3>
+            <div id="materials-list" class="materials-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="skills-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="skills-title">
+      <div class="modal-box wide">
+        <header class="modal-header">
+          <div><span class="eyebrow">可用技能点 <b id="sp-text">0</b></span><h2 id="skills-title">星灵技能树</h2></div>
+          <button class="close-btn" data-close="skills-panel" aria-label="关闭">×</button>
+        </header>
+        <div id="skill-trees" class="skill-trees"></div>
+      </div>
+    </section>
+
+    <section id="forge-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="forge-title">
+      <div class="modal-box wide forge-box">
+        <header class="modal-header">
+          <div><span class="eyebrow">星火营地</span><h2 id="forge-title">元素铁匠铺</h2></div>
+          <button class="close-btn" data-close="forge-panel" aria-label="关闭">×</button>
+        </header>
+        <div class="tabs" role="tablist">
+          <button class="active" data-forge-tab="craft">打造</button>
+          <button data-forge-tab="enhance">强化</button>
+          <button data-forge-tab="reforge">洗练</button>
+        </div>
+        <div id="forge-content"></div>
+      </div>
+    </section>
+
+    <section id="pause-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="modal-box compact center">
+        <span class="eyebrow">远征暂停</span>
+        <h2 id="pause-title">让星火稍作休息</h2>
+        <button id="resume-btn" class="primary full">继续游戏</button>
+        <button id="save-btn" class="full">立即存档</button>
+        <button id="return-camp-btn" class="full danger">放弃本层并返回营地</button>
+      </div>
+    </section>
+
+    <section id="death-panel" class="overlay modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-box compact center death-box">
+        <span class="eyebrow">星火未熄</span>
+        <h2>远征暂告失败</h2>
+        <p id="death-summary">你带回了本次收集的材料，整备后可以再次出发。</p>
+        <button id="revive-btn" class="primary full">返回星火营地</button>
+      </div>
+    </section>
+
+    <div id="toast-stack" aria-live="assertive"></div>
+    <div id="tooltip" class="tooltip hidden"></div>
+
+    <div id="mobile-controls" class="mobile-controls hidden" aria-label="触摸操作">
+      <div class="dpad">
+        <button data-key="KeyW">▲</button><button data-key="KeyA">◀</button>
+        <button data-key="KeyS">▼</button><button data-key="KeyD">▶</button>
+      </div>
+      <div class="action-pad">
+        <button data-key="KeyE">E</button><button data-key="Space">闪</button><button data-key="KeyJ">斩</button>
+      </div>
+    </div>
+  </main>
+  <script src="src/game.js" defer></script>
+</body>
+</html>
