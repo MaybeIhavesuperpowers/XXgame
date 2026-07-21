@@ -23,7 +23,7 @@
       </div>
 
       <nav class="menu-dock panel-glass" aria-label="游戏功能入口">
-        <button id="inventory-btn" class="dock-inventory"><i class="dock-art"></i><span>背包</span><b id="bag-badge">0 / 30</b></button>
+        <button id="inventory-btn" class="dock-inventory"><i class="dock-art"></i><span>背包</span><b id="bag-badge">0 / 120</b></button>
         <button id="skill-dock-btn" class="dock-skills"><i class="dock-art"></i><span>战技 / 天赋</span><b id="sp-badge">0</b></button>
         <button id="map-dock-btn" class="dock-map"><i class="dock-art"></i><span>星图</span></button>
         <button id="save-list-btn" class="dock-save"><i class="dock-art"></i><span>存档</span><b>L</b></button>
@@ -32,7 +32,7 @@
 
       <div class="world-card panel-glass">
         <canvas id="minimap" width="150" height="96" aria-label="迷你地图"></canvas>
-        <div><strong id="area-name">星火营地</strong><span id="depth-text">安全区</span></div>
+        <div class="world-summary"><strong id="area-name">星火营地</strong><span id="depth-text">安全区</span><span id="explore-text">探索 100%</span></div>
         <div class="currencies"><span>◉ <b id="gold-text">0</b></span><span>✧ <b id="void-text">0</b></span></div>
       </div>
 
@@ -54,6 +54,7 @@
         <span><kbd>Q</kbd> 药水 <b id="potion-text">×3</b></span>
         <span><kbd>E</kbd> 拾取 / 交互</span>
         <span><kbd>I</kbd> 背包</span>
+        <span><kbd>Tab</kbd> 区域地图</span>
         <span><kbd>T</kbd> 回营</span>
         <span><kbd>L / F5</kbd> <b id="save-state">存档</b></span>
       </div>
@@ -106,13 +107,29 @@
             <button id="skills-btn" class="primary full">战技与天赋星盘</button>
           </div>
           <div class="inventory-column">
-            <div class="section-heading"><h3>装备背包</h3><span id="inventory-count">0 / 30</span></div>
-            <p class="hint">点击装备进行穿戴；旧装备会自动放回背包。</p>
+            <div class="section-heading"><h3>装备背包</h3><span id="inventory-count">0 / 120</span></div>
+            <p class="hint">悬停对比身上装备；点击换装。背包共四页，每页 30 格。</p>
+            <div class="inventory-toolbar">
+              <label>批量出售 <select id="bulk-quality"><option value="white">粗糙</option><option value="green">普通</option><option value="blue">稀有</option><option value="purple">史诗</option><option value="gold">传说</option></select></label>
+              <button id="bulk-sell-btn" class="danger">出售该品质</button>
+              <div class="inventory-pager"><button id="inventory-prev" aria-label="上一页">‹</button><b id="inventory-page">1 / 4</b><button id="inventory-next" aria-label="下一页">›</button></div>
+            </div>
             <div id="inventory-grid" class="inventory-grid"></div>
             <h3>远征材料</h3>
             <div id="materials-list" class="materials-list"></div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section id="map-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="map-title">
+      <div class="modal-box map-box">
+        <header class="modal-header">
+          <div><span class="eyebrow">Tab 区域观测</span><h2 id="map-title">远征区域地图</h2></div>
+          <button class="close-btn" data-close="map-panel" aria-label="关闭">×</button>
+        </header>
+        <div class="map-toolbar"><strong id="map-progress">探索进度 0%</strong><span>白：人物　红：怪物　青：资源　金：传送阵</span><div><button id="map-zoom-out" aria-label="缩小地图">－</button><b id="map-zoom-text">1.0×</b><button id="map-zoom-in" aria-label="放大地图">＋</button><button id="map-zoom-reset">全图</button></div></div>
+        <canvas id="world-map" width="900" height="520" aria-label="可缩放区域地图"></canvas>
       </div>
     </section>
 

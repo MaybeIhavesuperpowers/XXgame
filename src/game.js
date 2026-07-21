@@ -5,8 +5,11 @@
   const ctx = canvas.getContext("2d");
   const minimap = document.getElementById("minimap");
   const mctx = minimap.getContext("2d");
+  const worldMap = document.getElementById("world-map");
+  const mapCtx = worldMap.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   mctx.imageSmoothingEnabled = false;
+  mapCtx.imageSmoothingEnabled = false;
 
   const W = canvas.width;
   const H = canvas.height;
@@ -14,7 +17,9 @@
   const SAVE_KEY = "pixel-era-five-realms-v1";
   const BACKUP_SAVE_KEY = `${SAVE_KEY}-backup`;
   const SLOT_SAVE_KEYS = [1,2,3].map(i => `${SAVE_KEY}-slot-${i}`);
-  const SAVE_FORMAT = 3;
+  const SAVE_FORMAT = 4;
+  const INVENTORY_CAPACITY = 120;
+  const INVENTORY_PAGE_SIZE = 30;
   const SLOT_NAMES = { weapon: "武器", helmet: "头盔", armor: "铠甲", boots: "靴子", amulet: "饰品" };
   const WEAPON_TYPES = ["sword", "spear", "axe", "staff", "daggers"];
   const WEAPON_NAMES = { sword: "长剑", spear: "长枪", axe: "战斧", staff: "星杖", daggers: "双刃" };
@@ -42,7 +47,8 @@
     peaks: "assets/sprites/peaks-atlas.png", abyss: "assets/sprites/abyss-atlas.png",
     equipment: "assets/sprites/equipment-atlas.png", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas.png",
     terrain: "assets/sprites/terrain-atlas.png", heroDirectional: "assets/sprites/hero-directional-atlas.png?v=2",
-    heroRun: "assets/sprites/hero-run-atlas-v2.png?v=3", equipmentLayers: "assets/sprites/hero-equipment-layers-v2.png?v=3",
+    heroRun: "assets/sprites/hero-run-atlas-v2.png?v=3", heroWalk: "assets/sprites/hero-walk-atlas-v3.png?v=4",
+    modularParts: "assets/sprites/hero-modular-parts-v3.png?v=4", equipmentLayers: "assets/sprites/hero-equipment-layers-v2.png?v=3",
     eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas.png?v=2",
     treantRoots: "assets/sprites/treant-root-vfx-v2.png?v=3", swordWave: "assets/sprites/sword-wave-v2.png?v=3"
   };
@@ -236,7 +242,7 @@
     player: { x: 0, y: 0, vx: 0, vy: 0, dirX: 1, dirY: 0, aimAngle: 0, radius: 12, invuln: 0, dash: 0, attackCd: 0, combo: 0, comboUntil: 0, swing: null, running: false, runKey: null, runUntil: 0, lastTap: {}, recoveryPose: 0, activeCd1: 0, activeCd2: 0 },
     enemies: [], particles: [], numbers: [], telegraphs: [], projectiles: [], impacts: [], resources: [], altars: [], groundDrops: [],
     screenShake: 0, hitStop: 0, lastTime: 0, autosave: 0, zoneTime: 0, hazardTimer: 2.5, unseenItems: 0,
-    forgeTab: "craft", selectedForge: null, runLoot: { gold: 0, materials: 0, kills: 0 },
+    forgeTab: "craft", selectedForge: null, inventoryPage: 0, mapZoom: 1, runLoot: { gold: 0, materials: 0, kills: 0 },
     audio: null
   };
 
@@ -337,7 +343,7 @@
     return {
       scene: "expedition", biome: game.biome, depth: game.depth, runLoot: game.runLoot,
       player: { x:game.player.x, y:game.player.y, dirX:game.player.dirX, dirY:game.player.dirY },
-      world: { seed:game.world.seed, exitLocked:game.world.exitLocked, revealed:[...game.world.revealed] },
+      world: { seed:game.world.seed, exit:game.world.exit, exitSpawned:game.world.exitSpawned, exitLocked:game.world.exitLocked, revealed:[...game.world.revealed] },
       enemies: game.enemies.filter(e=>!e.dead).map(e=>({name:e.name,color:e.color,speed:e.speed,hp:e.hp,maxHp:e.maxHp,damage:e.damage,typeIndex:e.typeIndex,elite:e.elite,x:e.x,y:e.y,homeX:e.homeX,homeY:e.homeY,radius:e.radius,boss:e.boss,attackCd:e.attackCd,specialCd:e.specialCd,phase:e.phase,pattern:e.pattern,statuses:e.statuses})),
       resources: game.resources.map(r=>({...r})), altars: game.altars.map(a=>({...a})), groundDrops:game.groundDrops.map(d=>({...d}))
     };
@@ -490,7 +496,7 @@
 
   function addItem(item) {
     const inv = game.save.equipment.inventory;
-    if (inv.length >= 30) {
+    if (inv.length >= INVENTORY_CAPACITY) {
       const sell = Math.max(8, item.level * (QUALITIES.findIndex(q => q.id === item.quality) + 1) * 4);
       game.save.currencies.gold += sell;
       toast(`背包已满，${item.name} 自动分解为 ${sell} 金币`, "#f2c65d");
@@ -543,10 +549,13 @@
 
   function restoreSession(session){
     const biome=clamp(Number(session.biome)||0,0,4),depth=clamp(Number(session.depth)||1,1,5);game.biome=biome;game.depth=depth;game.scene="expedition";game.paused=false;game.zoneTime=0;game.runLoot=session.runLoot||{gold:0,materials:0,kills:0};
-    game.world=generateMap(session.world?.seed||`${BIOMES[biome].id}-restored-${depth}`,biome,depth);game.world.exitLocked=session.world?.exitLocked??(depth===5);game.world.revealed=new Set(session.world?.revealed||[]);
+    game.world=generateMap(session.world?.seed||`${BIOMES[biome].id}-restored-${depth}`,biome,depth);game.world.revealed=new Set(session.world?.revealed||[]);
+    const savedWorld=session.world||{};if(savedWorld.exit){game.world.exit={...savedWorld.exit};game.world.exitSpawned=true;game.world.exitLocked=!!savedWorld.exitLocked;game.world.tiles[game.world.exit.y][game.world.exit.x]=4;}else if(savedWorld.exitLocked===false){game.world.exit={...game.world.fallbackExit};game.world.exitSpawned=true;game.world.exitLocked=false;game.world.tiles[game.world.exit.y][game.world.exit.x]=4;}
     game.player.x=session.player?.x??((game.world.start.x+.5)*TILE);game.player.y=session.player?.y??((game.world.start.y+.5)*TILE);game.player.dirX=session.player?.dirX??1;game.player.dirY=session.player?.dirY??0;game.player.vx=game.player.vy=0;game.player.invuln=1.8;game.player.swing=null;game.player.statuses={};
     game.enemies=[];(session.enemies||[]).forEach(saved=>{spawnEnemy(saved.typeIndex||0,saved.x,saved.y,!!saved.boss);const e=game.enemies[game.enemies.length-1];Object.assign(e,saved,{attack:saved.boss?null:ENEMY_ATTACKS[biome][saved.typeIndex||0],state:"patrol",stateTime:0,vx:0,vy:0,dead:false,statuses:saved.statuses||{}});});
     game.resources=(session.resources||[]).map(r=>({...r}));game.altars=(session.altars||[]).map(a=>({...a}));game.groundDrops=(session.groundDrops||[]).map(d=>({...d}));game.telegraphs=[];game.projectiles=[];game.impacts=[];game.particles=[];game.numbers=[];game.camera.x=game.camera.y=0;
+    const floorCleared=depth<5&&!game.enemies.some(e=>!e.dead&&!e.boss),bossCleared=depth===5&&!game.enemies.some(e=>!e.dead&&e.boss);
+    if(!game.world.exitSpawned&&(floorCleared||bossCleared))spawnExitNearPlayer(false);
     $("title-screen").classList.add("hidden");$("death-panel").classList.add("hidden");$("hud").classList.remove("hidden");closeAllModals();setMusicTheme(BIOME_ART_KEYS[biome]);updateCamera(1);updateHUD();
   }
 
@@ -600,13 +609,12 @@
         }
       }
     }
-    tiles[far.y][far.x] = 4;
     const floorCells = queue.filter(p => distances[p.y][p.x] > 7 && !(p.x === far.x && p.y === far.y));
     const hazards = biomeIndex === 1 ? 32 + depth * 6 : 0;
     for (let i = 0; i < hazards && floorCells.length; i++) {
       const p = rng.pick(floorCells); if (distances[p.y][p.x] > 10) tiles[p.y][p.x] = 6;
     }
-    return { seed, rng, cols, rows, tiles, start, exit: far, floorCells, distances, revealed: new Set(), exitLocked: depth === 5 };
+    return { seed, rng, cols, rows, tiles, start, exit: null, fallbackExit: far, exitSpawned: false, floorCells, walkableCells: queue, explorableCount: queue.length, distances, revealed: new Set(), exitLocked: true };
   }
 
   function enterFloor(biomeIndex, depth) {
@@ -638,7 +646,7 @@
     for (let i = 0; i < count; i++) {
       const p = pickCell(8); spawnEnemy(i % 4, (p.x + .5) * TILE, (p.y + .5) * TILE, false);
     }
-    if (depth === 5) spawnEnemy(0, (w.exit.x + .5) * TILE, (w.exit.y + .5) * TILE, true);
+    if (depth === 5) spawnEnemy(0, (w.fallbackExit.x + .5) * TILE, (w.fallbackExit.y + .5) * TILE, true);
     if (biomeIndex === 4) {
       for (let i = 0; i < 3; i++) { const p = pickCell(7); game.altars.push({ x: (p.x + .5) * TILE, y: (p.y + .5) * TILE, lit: false }); }
     }
@@ -797,6 +805,7 @@
       game.runLoot.materials += amount; numberFx(resource.x, resource.y - 18, `+${amount} ${MATERIAL_NAMES[resource.type]}`, BIOMES[game.biome].accent);
       burst(resource.x, resource.y, BIOMES[game.biome].accent, 10, 80); beep(380, .08, "square", .025); updateHUD(); return;
     }
+    if(!game.world.exit)return toast("清除本层所有敌人后，星门才会显现","#efc46d");
     const ex = { x: (game.world.exit.x + .5) * TILE, y: (game.world.exit.y + .5) * TILE };
     if (dist(ex, p) < 55) {
       if (game.world.exitLocked) return toast("击败区域领主后，星门才会回应", "#ef7168");
@@ -841,6 +850,23 @@
     playSfx("hit");if (e.hp <= 0) killEnemy(e);
   }
 
+  function explorationPercent() {
+    const w=game.world;if(!w)return 100;let explored=0;
+    for(const key of w.revealed){const [x,y]=key.split(",").map(Number);if(x>=0&&y>=0&&x<w.cols&&y<w.rows&&w.tiles[y][x]!==0)explored++;}
+    return clamp(Math.round(explored/Math.max(1,w.explorableCount)*100),0,100);
+  }
+
+  function spawnExitNearPlayer(announce=true) {
+    const w=game.world;if(!w||w.exitSpawned)return;
+    const px=Math.floor(game.player.x/TILE),py=Math.floor(game.player.y/TILE);
+    const candidates=w.walkableCells.filter(cell=>{const d=Math.hypot(cell.x-px,cell.y-py);return d>=2.2&&d<=5.2&&w.tiles[cell.y][cell.x]===1;}).sort((a,b)=>Math.abs(Math.hypot(a.x-px,a.y-py)-3.4)-Math.abs(Math.hypot(b.x-px,b.y-py)-3.4));
+    const exit=candidates[0]||w.walkableCells.find(cell=>w.tiles[cell.y][cell.x]===1&&!(cell.x===px&&cell.y===py))||w.fallbackExit;
+    w.exit={x:exit.x,y:exit.y};w.exitSpawned=true;w.exitLocked=false;w.tiles[exit.y][exit.x]=4;
+    for(let yy=-2;yy<=2;yy++)for(let xx=-2;xx<=2;xx++)w.revealed.add(`${exit.x+xx},${exit.y+yy}`);
+    const ex=(exit.x+.5)*TILE,ey=(exit.y+.5)*TILE;burst(ex,ey,BIOMES[game.biome].accent,28,190);playSfx("portal");
+    if(announce)toast(game.depth<5?"最后一个敌人已倒下，下一层星门在你附近显现！":"区域核心崩解，返程星门在你附近显现！","#ffe580");
+  }
+
   function killEnemy(e) {
     e.dead = true; game.runLoot.kills++;
     const xp = Math.round((e.boss ? 150 : 14) * (1 + game.biome * .45 + game.depth * .15));
@@ -848,17 +874,17 @@
     game.save.player.xp += xp; game.save.currencies.gold += gold; game.runLoot.gold += gold;
     numberFx(e.x, e.y - 28, `+${xp} XP  +${gold} ◉`, "#f8d16a"); burst(e.x, e.y, e.color, e.boss ? 35 : 13, e.boss ? 220 : 120);
     if (e.boss) {
-      game.world.exitLocked = false;
       spawnGroundDrop("equipment",e.x-20,e.y,{item:generateItem(game.biome, game.depth, 2, new RNG(Date.now() + "boss1"))});
       spawnGroundDrop("equipment",e.x+20,e.y,{item:generateItem(game.biome, game.depth, 1, new RNG(Date.now() + "boss2"))});
       spawnGroundDrop("potion",e.x,e.y+18);spawnGroundDrop("potion",e.x,e.y+18);
-      toast(`${e.name} 已被击败，通往营地的星门开启！`, "#ffe580");
+      spawnExitNearPlayer(true);
     } else if (Math.random() < .115 + game.save.skills.explore.alchemy * .08) {
       spawnGroundDrop("equipment",e.x,e.y,{item:generateItem(game.biome, game.depth)});
     }
     const biome=BIOMES[game.biome],rareChance=e.boss?1:Math.min(.92,(e.elite?.72:.07+game.depth*.012)*(1+statValue("rareFind")));
     if(Math.random()<rareChance){const amount=e.boss?2:1;spawnGroundDrop("material",e.x,e.y,{material:biome.rare,amount});numberFx(e.x,e.y-46,`${biome.rareName} ×${amount}`,biome.accent);}
     if(!e.boss&&Math.random()<(e.elite?.24:.055))spawnGroundDrop("potion",e.x,e.y);
+    if(!e.boss&&game.depth<5&&!game.enemies.some(enemy=>!enemy.dead&&!enemy.boss))spawnExitNearPlayer(true);
     checkLevelUp(); updateHUD();
   }
 
@@ -1110,6 +1136,11 @@
   function drawEffect(index,x,y,size,opts={}){return drawAtlasCell(ART.effects,index%5,Math.floor(index/5),5,3,x,y,size,size,opts);}
   function drawMonsterEffect(col,row,x,y,size,opts={}){return drawAtlasCell(ART.monsterEffects,col,row,5,4,x,y,size,size,opts);}
   function drawEquipmentLayer(col,row,x,y,w,h,opts={}){return drawAtlasCell(ART.equipmentLayers,col,row,5,4,x,y,w,h,opts);}
+  function drawModularPart(col,row,x,y,w,h,opts={}){return drawAtlasCell(ART.modularParts,col,row,5,5,x,y,w,h,opts);}
+  function drawModularHalf(col,row,half,x,y,w,h,{flip=false,rotation=0,alpha=1,filter="none"}={}){
+    const img=ART.modularParts;if(!img?.complete||!img.naturalWidth)return false;const sw=img.naturalWidth/5,sh=img.naturalHeight/5,sourceWidth=sw/2;
+    ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.scale(flip?-1:1,1);ctx.globalAlpha*=alpha;ctx.filter=filter;ctx.drawImage(img,col*sw+half*sourceWidth,row*sh,sourceWidth,sh,-w/2,-h/2,w,h);ctx.restore();return true;
+  }
   function drawTreantEffect(frame,x,y,w,h,opts={}){return drawAtlasCell(ART.treantRoots,clamp(frame,0,3),0,4,1,x,y,w,h,opts);}
   function drawSwordWave(x,y,size,opts={}){return drawAtlasCell(ART.swordWave,0,0,1,1,x,y,size,size,opts);}
 
@@ -1149,20 +1180,27 @@
   }
 
   function drawPlayer(p, time) {
-    const type=equippedWeaponType(),speed=Math.hypot(p.vx,p.vy),moving=speed>12,row=p.swing?3:p.recoveryPose>0?4:moving?1:0,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):(Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX)),ax=Math.cos(angle),ay=Math.sin(angle),dirCol=Math.abs(ax)>=Math.abs(ay)?(ax>=0?0:2):(ay>=0?1:3),cycle=p.running?12:moving?9:2.5,bob=p.dash>0?0:Math.sin(time*cycle)*(p.running?2.2:moving?1.8:1),tilt=moving?Math.sin(time*cycle)*.014:0,equipped=game.save.equipment.equipped;
+    const type=equippedWeaponType(),speed=Math.hypot(p.vx,p.vy),moving=speed>12,locomoting=moving&&!p.swing&&p.recoveryPose<=0,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):(Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX)),ax=Math.cos(angle),ay=Math.sin(angle),dirCol=Math.abs(ax)>=Math.abs(ay)?(ax>=0?0:2):(ay>=0?1:3),running=locomoting&&p.running,runFrame=Math.floor(time*12)%4,walkFrame=Math.floor(time*7)%2,frame=running?runFrame:walkFrame,cycle=running?12:moving?7:2.5;
+    const bob=p.dash>0?0:running?[0,-2,0,2][runFrame]:moving?(walkFrame?-1.2:1.2):Math.sin(time*cycle),stride=running?[-3.2,0,3.2,0][runFrame]:(moving?(walkFrame?-1.8:1.8):0),armSwing=-stride*.72,tilt=moving?Math.sin(time*cycle)*.014:0,equipped=game.save.equipment.equipped,layerFlip=dirCol===2,backAlpha=dirCol===3?.78:1,flashFilter=p.hurtFx>0?"brightness(1.6) saturate(.65)":"none";
     const blinkAlpha=p.invuln>0&&Math.floor(time*18)%2?.46:1;ctx.save();ctx.globalAlpha=blinkAlpha;
     if(equipped.amulet){const c=BIOMES[equipped.amulet.region||0].accent;ctx.globalAlpha=blinkAlpha*(.18+.05*Math.sin(time*5));ctx.fillStyle=c;ctx.beginPath();ctx.arc(p.x,p.y-19,35+Math.sin(time*4)*2,0,Math.PI*2);ctx.fill();ctx.globalAlpha=blinkAlpha;}
-    const bodyOpts={rotation:tilt,filter:p.hurtFx>0?"brightness(1.6) saturate(.65)":"none"};
-    if(p.running&&moving&&!p.swing&&p.recoveryPose<=0)drawAtlasCell(ART.heroRun,dirCol,Math.floor(time*12)%4,4,4,p.x,p.y-22+bob,82,102,bodyOpts);
-    else drawAtlasCell(ART.heroDirectional,dirCol,row,4,5,p.x,p.y-22+bob,82,102,bodyOpts);
-    const layerFlip=dirCol===2,backAlpha=dirCol===3?.76:1;
-    if(equipped.boots){const c=equipmentCoords(equipped.boots);drawEquipmentLayer(c.col,2,p.x,p.y+9+bob,35,35,{alpha:.88*backAlpha,flip:layerFlip});}
-    if(equipped.armor){const c=equipmentCoords(equipped.armor);drawEquipmentLayer(c.col,1,p.x,p.y-21+bob,48,45,{alpha:.9*backAlpha,flip:layerFlip});}
-    if(equipped.helmet){const c=equipmentCoords(equipped.helmet);drawEquipmentLayer(c.col,0,p.x,p.y-47+bob,35,34,{alpha:.94*backAlpha,flip:layerFlip});}
-    if(equipped.amulet&&dirCol!==3){const c=equipmentCoords(equipped.amulet);drawEquipmentLayer(c.col,3,p.x+(dirCol===0?5:dirCol===2?-5:0),p.y-28+bob,18,18,{alpha:.96,flip:layerFlip});}
-    const swingProgress=p.swing?clamp(1-p.swing.t/p.swing.max,0,1):.5,swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,swingProgress):0,weaponAngle=angle+swingArc,wax=Math.cos(weaponAngle),way=Math.sin(weaponAngle),socket=[{x:15,y:-23},{x:8,y:-19},{x:-15,y:-23},{x:7,y:-27}][dirCol],handX=p.x+socket.x,handY=p.y+socket.y+bob,gripDistance={sword:18,spear:24,axe:19,staff:23,daggers:14}[type]||18,weaponSize=type==="spear"?50:type==="axe"?48:43,weaponX=handX+wax*gripDistance,weaponY=handY+way*gripDistance;
-    if(p.swing){const effectSize=(type==="axe"?105:type==="spear"?82:type==="staff"?72:76)+(p.swing.combo===3?18:0),effectDistance=gripDistance+weaponSize*.34,effectX=handX+wax*effectDistance,effectY=handY+way*effectDistance,offset={spear:Math.PI/4,axe:0,staff:Math.PI/4,daggers:2.5}[type]||0;if(type==="sword")drawSwordWave(effectX,effectY,effectSize,{rotation:weaponAngle,alpha:.82});else drawEffect(WEAPON_TYPES.indexOf(type),effectX,effectY,effectSize,{rotation:weaponAngle+offset,alpha:.78});drawEffect(10,handX,handY,19+(p.swing.combo===3?5:0),{rotation:weaponAngle,alpha:.58});}
-    if(equipped.weapon){const c=equipmentCoords(equipped.weapon),weaponRotation={sword:Math.PI/4,spear:Math.PI/4,axe:Math.PI*.75,staff:Math.PI/3,daggers:Math.PI/4}[type]||Math.PI/4;drawAtlasCell(ART.equipment,c.col,c.row,5,5,weaponX,weaponY,weaponSize,weaponSize,{rotation:weaponAngle+weaponRotation,alpha:.98});}
+
+    // The silhouette is the undersuit. Every visible equipped area below is a separately animated node.
+    const bodyOpts={rotation:tilt,filter:flashFilter};
+    if(running)drawAtlasCell(ART.heroRun,dirCol,runFrame,4,4,p.x,p.y-22+bob,82,102,bodyOpts);
+    else if(locomoting)drawAtlasCell(ART.heroWalk,dirCol,walkFrame,4,2,p.x,p.y-22+bob,82,102,bodyOpts);
+    else drawAtlasCell(ART.heroDirectional,dirCol,p.swing?3:p.recoveryPose>0?4:0,4,5,p.x,p.y-22+bob,82,102,bodyOpts);
+
+    const region=item=>clamp(item?.region??0,0,4),facing={x:[1,0,-1,0][dirCol],y:[0,1,0,-1][dirCol]},side={x:-facing.y,y:facing.x},feetY=p.y+8+bob,bodyX=p.x+facing.x*(running?1.4:0),bodyY=p.y-21+bob+(running?Math.abs(stride)*.12:0);
+    if(equipped.boots){const col=region(equipped.boots);drawModularHalf(col,3,0,p.x-8+facing.x*stride,feetY+facing.y*stride,18,27,{rotation:-tilt*2,alpha:.94*backAlpha,flip:layerFlip,filter:flashFilter});drawModularHalf(col,3,1,p.x+8-facing.x*stride,feetY-facing.y*stride,18,27,{rotation:tilt*2,alpha:.94*backAlpha,flip:layerFlip,filter:flashFilter});}
+    if(equipped.armor)drawModularPart(region(equipped.armor),2,bodyX,bodyY,51,51,{rotation:tilt,alpha:.96*backAlpha,flip:layerFlip,filter:flashFilter});
+    if(equipped.helmet)drawModularPart(region(equipped.helmet),0,p.x-facing.x*tilt*35,p.y-48+bob-Math.abs(stride)*.1,38,38,{rotation:-tilt*.55,alpha:.98*backAlpha,flip:layerFlip,filter:flashFilter});
+    if(equipped.amulet&&dirCol!==3)drawEquipmentLayer(region(equipped.amulet),3,p.x+facing.x*5,p.y-29+bob,18,18,{alpha:.96,flip:layerFlip});
+
+    const swingProgress=p.swing?clamp(1-p.swing.t/p.swing.max,0,1):.5,swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,swingProgress):0,weaponAngle=angle+swingArc,wax=Math.cos(weaponAngle),way=Math.sin(weaponAngle),socket=[{x:15,y:-23},{x:8,y:-19},{x:-15,y:-23},{x:7,y:-27}][dirCol],handX=p.x+socket.x,handY=p.y+socket.y+bob,offHandX=p.x-socket.x*.72+side.x*2,offHandY=p.y+socket.y+bob+side.y*2+armSwing*.36,gripDistance={sword:18,spear:24,axe:19,staff:23,daggers:14}[type]||18,weaponSize=type==="spear"?53:type==="axe"?50:46,weaponX=handX+wax*gripDistance,weaponY=handY+way*gripDistance;
+    if(equipped.armor){const col=region(equipped.armor),attackReach=p.swing?4:0;drawModularHalf(col,1,0,offHandX-facing.x*armSwing,offHandY-facing.y*armSwing,20,31,{rotation:-tilt*2,alpha:.97*backAlpha,flip:layerFlip,filter:flashFilter});drawModularHalf(col,1,1,handX+wax*attackReach,handY+way*attackReach,20,31,{rotation:p.swing?weaponAngle*.08:tilt*2,alpha:.99,flip:layerFlip,filter:flashFilter});}
+    if(equipped.weapon){const weaponRotation={sword:Math.PI/4,spear:Math.PI/4,axe:Math.PI*.75,staff:Math.PI/3,daggers:Math.PI/4}[type]||Math.PI/4;drawModularPart(Math.max(0,WEAPON_TYPES.indexOf(type)),4,weaponX,weaponY,weaponSize,weaponSize,{rotation:weaponAngle+weaponRotation,alpha:.99,filter:flashFilter});}
+    if(p.swing){const effectSize=(type==="axe"?105:type==="spear"?82:type==="staff"?72:76)+(p.swing.combo===3?18:0),effectDistance=gripDistance+weaponSize*.44,effectX=handX+wax*effectDistance,effectY=handY+way*effectDistance,offset={spear:Math.PI/4,axe:0,staff:Math.PI/4,daggers:2.5}[type]||0;if(type==="sword")drawSwordWave(effectX,effectY,effectSize,{rotation:weaponAngle,alpha:.82});else drawEffect(WEAPON_TYPES.indexOf(type),effectX,effectY,effectSize,{rotation:weaponAngle+offset,alpha:.78});}
     ctx.restore();
     const statuses=Object.keys(p.statuses||{});statuses.forEach((s,i)=>{const idx={burn:11,slow:12,poison:13,stun:14,charm:9}[s];drawEffect(idx,p.x-18+i*12,p.y-55,25,{alpha:.82});});
   }
@@ -1200,7 +1238,7 @@
     const shakeX = game.screenShake ? (Math.random() - .5) * game.screenShake : 0, shakeY = game.screenShake ? (Math.random() - .5) * game.screenShake : 0;
     ctx.translate(Math.round(-game.camera.x + shakeX), Math.round(-game.camera.y + shakeY));
     if (game.scene === "camp") drawCamp(time); else if (game.scene === "expedition" && game.world) drawWorld(time); else { ctx.fillStyle = "#0b0d16"; ctx.fillRect(0,0,W,H); }
-    ctx.restore(); drawMinimap();
+    ctx.restore(); drawMinimap();if(!$("map-panel").classList.contains("hidden"))drawWorldMap();
   }
 
   function drawMinimap() {
@@ -1215,6 +1253,24 @@
     const boss = game.enemies.find(e => e.boss && !e.dead); if (boss) { mctx.fillStyle = "#ff4f62"; mctx.fillRect(boss.x/TILE*sx-2,boss.y/TILE*sy-2,5,5); }
     mctx.fillStyle = "#fff"; mctx.fillRect(game.player.x/TILE*sx-2,game.player.y/TILE*sy-2,5,5);
   }
+
+  function drawWorldMap() {
+    mapCtx.clearRect(0,0,worldMap.width,worldMap.height);mapCtx.fillStyle="#070910";mapCtx.fillRect(0,0,worldMap.width,worldMap.height);
+    if(game.scene!=="expedition"||!game.world){mapCtx.fillStyle="#b8ad9d";mapCtx.font="700 18px Microsoft YaHei";mapCtx.textAlign="center";mapCtx.fillText("星火营地无需区域地图",worldMap.width/2,worldMap.height/2);mapCtx.textAlign="left";return;}
+    const w=game.world,zoom=game.mapZoom,visibleCols=w.cols/zoom,visibleRows=w.rows/zoom,centerX=game.player.x/TILE,centerY=game.player.y/TILE,startX=clamp(centerX-visibleCols/2,0,Math.max(0,w.cols-visibleCols)),startY=clamp(centerY-visibleRows/2,0,Math.max(0,w.rows-visibleRows)),sx=worldMap.width/visibleCols,sy=worldMap.height/visibleRows,b=BIOMES[game.biome];
+    const toScreen=(x,y)=>({x:(x-startX)*sx,y:(y-startY)*sy});
+    const minX=Math.floor(startX),maxX=Math.min(w.cols,Math.ceil(startX+visibleCols)),minY=Math.floor(startY),maxY=Math.min(w.rows,Math.ceil(startY+visibleRows));
+    for(let y=minY;y<maxY;y++)for(let x=minX;x<maxX;x++){const pt=toScreen(x,y),known=w.revealed.has(`${x},${y}`),tile=w.tiles[y][x];mapCtx.fillStyle=!known?"#090a10":tile===0?"#14121a":tile===4?"#f3c756":tile===6?"#d75934":b.color;mapCtx.fillRect(Math.floor(pt.x),Math.floor(pt.y),Math.ceil(sx+.4),Math.ceil(sy+.4));if(known&&zoom>=2.5){mapCtx.strokeStyle="rgba(255,255,255,.04)";mapCtx.strokeRect(Math.floor(pt.x),Math.floor(pt.y),Math.ceil(sx),Math.ceil(sy));}}
+    const marker=(x,y,color,size)=>{const pt=toScreen(x/TILE,y/TILE);if(pt.x<0||pt.y<0||pt.x>worldMap.width||pt.y>worldMap.height)return;mapCtx.fillStyle=color;mapCtx.fillRect(pt.x-size/2,pt.y-size/2,size,size);};
+    game.resources.filter(r=>!r.gathered&&w.revealed.has(`${Math.floor(r.x/TILE)},${Math.floor(r.y/TILE)}`)).forEach(r=>marker(r.x,r.y,"#68e8e0",zoom>1?6:4));
+    game.groundDrops.filter(d=>w.revealed.has(`${Math.floor(d.x/TILE)},${Math.floor(d.y/TILE)}`)).forEach(d=>marker(d.x,d.y,"#d78dff",zoom>1?6:4));
+    game.enemies.filter(e=>!e.dead&&w.revealed.has(`${Math.floor(e.x/TILE)},${Math.floor(e.y/TILE)}`)).forEach(e=>marker(e.x,e.y,e.boss?"#ff3559":"#e86d67",e.boss?10:6));
+    if(w.exit)marker((w.exit.x+.5)*TILE,(w.exit.y+.5)*TILE,"#ffe35e",10);
+    marker(game.player.x,game.player.y,"#ffffff",9);mapCtx.strokeStyle=BIOMES[game.biome].accent;mapCtx.lineWidth=2;mapCtx.strokeRect(1,1,worldMap.width-2,worldMap.height-2);
+    $("map-progress").textContent=`探索进度 ${explorationPercent()}% · 敌人 ${game.enemies.filter(e=>!e.dead).length} · 资源 ${game.resources.filter(r=>!r.gathered).length}`;$("map-zoom-text").textContent=`${zoom.toFixed(1)}×`;
+  }
+
+  function setMapZoom(value){game.mapZoom=clamp(Math.round(value*2)/2,1,4);drawWorldMap();}
 
   function loop(now) {
     const raw = Math.min(.034, (now - game.lastTime) / 1000 || 0); game.lastTime = now;
@@ -1231,30 +1287,31 @@
     $("stamina-fill").style.width = `${p.stamina}%`; $("stamina-text").textContent = `${fmt(p.stamina)} / 100`;
     $("xp-fill").style.width = `${p.xp / need * 100}%`; $("xp-text").textContent = `${fmt(p.xp)} / ${fmt(need)}`;
     $("gold-text").textContent = fmt(game.save.currencies.gold); $("void-text").textContent = fmt(game.save.currencies.void); $("potion-text").textContent = `×${p.potions}`;
-    $("bag-badge").textContent = game.unseenItems ? `+${game.unseenItems} 新 · ${game.save.equipment.inventory.length}/30` : `${game.save.equipment.inventory.length} / 30`;
+    $("bag-badge").textContent = game.unseenItems ? `+${game.unseenItems} · ${game.save.equipment.inventory.length}/${INVENTORY_CAPACITY}` : `${game.save.equipment.inventory.length} / ${INVENTORY_CAPACITY}`;
     $("inventory-btn").classList.toggle("has-new", game.unseenItems > 0);
     $("return-dock-btn")?.classList.toggle("hidden",game.scene!=="expedition");
     $("sp-badge").textContent = game.save.player.skillPoints ? `${game.save.player.skillPoints} 点可用` : "0 点";
     if (game.scene === "camp") {
-      $("area-name").textContent = "星火营地"; $("depth-text").textContent = "安全区 · 可自由移动"; $("quest-text").textContent = "WASD 在营地移动；按 M 选择远征，按 B 打造装备";
+      $("area-name").textContent = "星火营地"; $("depth-text").textContent = "安全区 · 可自由移动"; $("explore-text").textContent="探索 100%"; $("quest-text").textContent = "WASD 在营地移动；按 M 选择远征，按 B 打造装备";
       $("boss-wrap").classList.add("hidden"); return;
     }
-    const b = BIOMES[game.biome]; $("area-name").textContent = b.name; $("depth-text").textContent = `深度 ${game.depth} / 5 · ${b.mechanic}`;
+    const b = BIOMES[game.biome],explored=explorationPercent(); $("area-name").textContent = b.name; $("depth-text").textContent = `深度 ${game.depth} / 5`;$("explore-text").textContent=`探索 ${explored}%`;
     const boss = game.enemies.find(e => e.boss && !e.dead);
     if (boss) {
       $("boss-wrap").classList.remove("hidden"); $("boss-name").textContent = boss.name; $("boss-fill").style.width = `${Math.max(0,boss.hp / boss.maxHp * 100)}%`;
       $("quest-text").textContent = `击败区域领主「${boss.name}」，解除星门封锁`;
     } else {
       $("boss-wrap").classList.add("hidden");
-      const ex = { x: (game.world.exit.x + .5) * TILE, y: (game.world.exit.y + .5) * TILE };
+      const ex = game.world.exit?{ x: (game.world.exit.x + .5) * TILE, y: (game.world.exit.y + .5) * TILE }:null;
       const nearby = game.resources.find(r => !r.gathered && dist(r, game.player) < 55);
       const drop = game.groundDrops.find(d=>dist(d,game.player)<65);
       const altar = game.altars.find(a => !a.lit && dist(a, game.player) < 60);
       if(drop) $("quest-text").textContent=`按 E 拾取${drop.kind==="equipment"?drop.item.name:drop.kind==="potion"?"生命药水":MATERIAL_NAMES[drop.material]}`;
       else if (altar) $("quest-text").textContent = "按 E 点燃深渊祭坛，扩展视野";
       else if (nearby) $("quest-text").textContent = `按 E 开采${MATERIAL_NAMES[nearby.type]}`;
-      else if (dist(ex, game.player) < 80) $("quest-text").textContent = `按 E 进入${game.depth < 5 ? "下一深度" : "返程星门"}`;
-      else $("quest-text").textContent = game.depth === 5 ? "穿越迷宫，寻找盘踞核心的区域领主" : "探索地图、采集资源并寻找远端星门";
+      else if (ex&&dist(ex, game.player) < 80) $("quest-text").textContent = `按 E 进入${game.depth < 5 ? "下一深度" : "返程星门"}`;
+      else if(ex)$("quest-text").textContent=`星门已在附近出现 · 地图探索 ${explored}%`;
+      else {const remaining=game.enemies.filter(e=>!e.dead&&!e.boss).length;$("quest-text").textContent=game.depth===5?"穿越迷宫，寻找盘踞核心的区域领主":`清除本层敌人：剩余 ${remaining} · 探索 ${explored}%`;}
     }
   }
 
@@ -1266,7 +1323,9 @@
     if (id === "skills-panel") renderSkills();
     if (id === "forge-panel") renderForge();
     if (id === "save-panel") renderSavePanel();
-    panel.classList.remove("hidden"); game.paused = true;
+    panel.classList.remove("hidden");
+    if (id === "map-panel") drawWorldMap();
+    game.paused = true;
   }
 
   function closePanel(id) {
@@ -1298,16 +1357,18 @@
     return fmt(value);
   }
 
-  function itemTooltip(item) {
-    const q = qualityById(item.quality); const mainName = { attack:"攻击力",defense:"防御力",maxHp:"最大生命" }[item.main.type];
-    return `<div class="tooltip-top">${itemArtHTML(item,"tooltip-art")}<div><h4 style="color:${q.color}">${q.name} · ${item.name}${item.enhance?` +${item.enhance}`:""}</h4><div>${SLOT_NAMES[item.slot]}${item.slot==="weapon"?` · ${WEAPON_PROFILES[weaponTypeOf(item)].label}`:""} · 物品等级 ${item.level}</div></div></div><div style="color:#fff1b3;margin:6px 0">${mainName} +${itemMainValue(item)}</div>${item.affixes.map(a=>`<div class="${a.special?"special-affix":""}">• ${a.special?"✦ ":""}${a.name} +${formatStat(a.type,a.value)}</div>`).join("")}${item.legendary?`<div style="color:#ffd66b;margin-top:6px">◆ ${item.legendary.name}<br>${item.legendary.text}</div>`:""}<div class="lore">${item.lore}</div>`;
+  function itemTooltipCard(item,label="") {
+    const q=qualityById(item.quality),mainName={attack:"攻击力",defense:"防御力",maxHp:"最大生命"}[item.main.type];
+    return `${label?`<span class="compare-label">${label}</span>`:""}<div class="tooltip-top">${itemArtHTML(item,"tooltip-art")}<div><h4 style="color:${q.color}">${q.name} · ${item.name}${item.enhance?` +${item.enhance}`:""}</h4><div>${SLOT_NAMES[item.slot]}${item.slot==="weapon"?` · ${WEAPON_PROFILES[weaponTypeOf(item)].label}`:""} · 物品等级 ${item.level}</div></div></div><div style="color:#fff1b3;margin:6px 0">${mainName} +${itemMainValue(item)}</div>${item.affixes.map(a=>`<div class="${a.special?"special-affix":""}">• ${a.special?"✦ ":""}${a.name} +${formatStat(a.type,a.value)}</div>`).join("")}${item.legendary?`<div style="color:#ffd66b;margin-top:6px">◆ ${item.legendary.name}<br>${item.legendary.text}</div>`:""}${label?"":`<div class="lore">${item.lore}</div>`}`;
   }
 
-  function bindItemTooltip(node, item) {
+  function itemTooltip(item,equipped=null){if(!equipped||equipped.id===item.id)return itemTooltipCard(item);const delta=itemMainValue(item)-itemMainValue(equipped),affixDelta=item.affixes.length-equipped.affixes.length,deltaClass=delta>0?"compare-up":delta<0?"compare-down":"compare-even";return `<div class="item-comparison"><div class="compare-card">${itemTooltipCard(item,"背包装备")}</div><div class="compare-card">${itemTooltipCard(equipped,"当前穿戴")}</div><div class="compare-delta ${deltaClass}">主属性 ${delta>0?"+":""}${delta}　·　词条数 ${affixDelta>0?"+":""}${affixDelta}</div></div>`;}
+
+  function bindItemTooltip(node, item, equipped = null) {
     node.addEventListener("pointerenter", e => {
-      const tip = $("tooltip"); tip.innerHTML = itemTooltip(item); tip.classList.remove("hidden"); moveTooltip(e);
+      const tip = $("tooltip"); tip.innerHTML = itemTooltip(item,equipped); tip.classList.toggle("compare",!!equipped&&equipped.id!==item.id);tip.classList.remove("hidden"); moveTooltip(e);
     });
-    node.addEventListener("pointermove", moveTooltip); node.addEventListener("pointerleave", () => $("tooltip").classList.add("hidden"));
+    node.addEventListener("pointermove", moveTooltip); node.addEventListener("pointerleave", () => {$("tooltip").classList.add("hidden");$("tooltip").classList.remove("compare");});
   }
 
   function moveTooltip(e) {
@@ -1325,7 +1386,7 @@
       const item = game.save.equipment.equipped[slot]; const node = document.createElement("div"); node.dataset.slot = slot; node.className = `equipment-slot ${item ? `quality-${item.quality}` : "empty"}`; node.innerHTML = item ? `${itemArtHTML(item)}<b>${item.name}</b><span>${item.main.type === "attack" ? "攻" : item.main.type === "defense" ? "防" : "命"} ${itemMainValue(item)}</span>` : `<span>${label}</span>`;
       if (item) { bindItemTooltip(node,item); node.addEventListener("click",()=>unequip(slot)); } equipment.append(node);
     });
-    const doll = $("paperdoll-hero"); if (doll) {doll.style.setProperty("--weapon-col",WEAPON_TYPES.indexOf(equippedWeaponType()));const layers=[["helmet",0],["armor",1],["boots",2],["amulet",3]];if(!doll.querySelector(".doll-layer"))doll.innerHTML=layers.map(([slot,row])=>`<i class="doll-layer doll-${slot}" data-doll-slot="${slot}" style="--layer-row:${row}"></i>`).join("");layers.forEach(([slot])=>{const layer=doll.querySelector(`[data-doll-slot="${slot}"]`),item=game.save.equipment.equipped[slot];layer.classList.toggle("hidden",!item);if(item)layer.style.setProperty("--layer-col",clamp(item.region??0,0,4));});}
+    const doll = $("paperdoll-hero"); if (doll) {const equipped=game.save.equipment.equipped,layers=[["helmet","head",0,equipped.helmet],["armor","hands",1,equipped.armor],["armor","body",2,equipped.armor],["boots","feet",3,equipped.boots],["weapon","weapon",4,equipped.weapon]];doll.innerHTML=layers.map(([slot,part,row,item])=>`<i class="doll-layer doll-${part}${item?"":" hidden"}" data-doll-slot="${slot}" style="--layer-row:${row};--layer-col:${item?(slot==="weapon"?Math.max(0,WEAPON_TYPES.indexOf(weaponTypeOf(item))):clamp(item.region??0,0,4)):0}"></i>`).join("");doll.classList.toggle("has-amulet",!!equipped.amulet);}
     const st = stats(); const rows = [
       ["攻击力",fmt(st.attack)],["防御力",fmt(st.defense)],["最大生命",fmt(st.maxHp)],["暴击率",formatStat("critRate",st.critRate)],
       ["暴击伤害",formatStat("critDamage",st.critDamage)],["攻击速度",formatStat("attackSpeed",st.attackSpeed-1)],["闪避率",formatStat("dodge",st.dodge)],
@@ -1333,9 +1394,10 @@
       ["元素增伤",formatStat("elementalDamage",statValue("elementalDamage"))],["稀有寻获",formatStat("rareFind",statValue("rareFind"))]
     ];
     $("stats-list").innerHTML = rows.map(r=>`<div class="stat-row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join("");
-    const inv = game.save.equipment.inventory; $("inventory-count").textContent = `${inv.length} / 30`; const grid = $("inventory-grid"); grid.innerHTML = "";
-    inv.forEach(item => { const n=document.createElement("div"); n.className=`item-cell quality-${item.quality}`; n.innerHTML=`${itemArtHTML(item)}<b>${item.name}</b>${item.enhance?`<span class="plus">+${item.enhance}</span>`:""}<button class="sell-btn" title="出售装备">售</button>`; bindItemTooltip(n,item); n.addEventListener("click",()=>equipItem(item.id));n.querySelector(".sell-btn").addEventListener("click",e=>{e.stopPropagation();sellItem(item.id);}); grid.append(n); });
-    for(let i=inv.length;i<30;i++){const n=document.createElement("div");n.className="item-cell";grid.append(n);}
+    const inv=game.save.equipment.inventory,pageCount=Math.ceil(INVENTORY_CAPACITY/INVENTORY_PAGE_SIZE);game.inventoryPage=clamp(game.inventoryPage,0,pageCount-1);const pageItems=inv.slice(game.inventoryPage*INVENTORY_PAGE_SIZE,(game.inventoryPage+1)*INVENTORY_PAGE_SIZE);$("inventory-count").textContent=`${inv.length} / ${INVENTORY_CAPACITY}`;$("inventory-page").textContent=`${game.inventoryPage+1} / ${pageCount}`;$("inventory-prev").disabled=game.inventoryPage<=0;$("inventory-next").disabled=game.inventoryPage>=pageCount-1;const grid=$("inventory-grid");grid.innerHTML="";
+    pageItems.forEach(item=>{const n=document.createElement("div");n.className=`item-cell quality-${item.quality}`;n.innerHTML=`${itemArtHTML(item)}<b>${item.name}</b>${item.enhance?`<span class="plus">+${item.enhance}</span>`:""}<button class="sell-btn" title="出售装备">售</button>`;bindItemTooltip(n,item,game.save.equipment.equipped[item.slot]);n.addEventListener("click",()=>equipItem(item.id));n.querySelector(".sell-btn").addEventListener("click",e=>{e.stopPropagation();sellItem(item.id);});grid.append(n);});
+    for(let i=pageItems.length;i<INVENTORY_PAGE_SIZE;i++){const n=document.createElement("div");n.className="item-cell";grid.append(n);}
+    $("inventory-prev").onclick=()=>{game.inventoryPage=Math.max(0,game.inventoryPage-1);renderCharacterPanel();};$("inventory-next").onclick=()=>{game.inventoryPage=Math.min(pageCount-1,game.inventoryPage+1);renderCharacterPanel();};const bulkSelect=$("bulk-quality"),bulkButton=$("bulk-sell-btn"),refreshBulk=()=>{const q=bulkSelect.value,count=inv.filter(item=>item.quality===q).length;bulkButton.textContent=`出售该品质（${count}）`;bulkButton.disabled=!count;};bulkSelect.onchange=refreshBulk;bulkButton.onclick=()=>sellQuality(bulkSelect.value);refreshBulk();
     $("materials-list").innerHTML = Object.entries(game.save.materials).filter(([,v])=>v>0).map(([k,v])=>`<div class="material">${materialArtHTML(k)}<span>${MATERIAL_NAMES[k]}</span><b>${v}</b></div>`).join("") || `<div class="hint">尚未获得材料</div>`;
     updateHUD();
   }
@@ -1347,11 +1409,13 @@
   }
 
   function unequip(slot) {
-    const inv=game.save.equipment.inventory,item=game.save.equipment.equipped[slot]; if(!item||inv.length>=30)return toast("背包已满，无法卸下");
+    const inv=game.save.equipment.inventory,item=game.save.equipment.equipped[slot]; if(!item||inv.length>=INVENTORY_CAPACITY)return toast("背包已满，无法卸下");
     inv.push(item);game.save.equipment.equipped[slot]=null;game.save.player.hp=Math.min(stats().maxHp,game.save.player.hp);renderCharacterPanel();saveGame(true);
   }
 
-  function sellItem(id){const inv=game.save.equipment.inventory,idx=inv.findIndex(i=>i.id===id);if(idx<0)return;const item=inv[idx],qi=QUALITIES.findIndex(q=>q.id===item.quality)+1,value=Math.max(10,Math.round(item.level*qi*5*(1+item.enhance*.35)));inv.splice(idx,1);game.save.currencies.gold+=value;toast(`出售 ${item.name}，获得 ${value} 金币`,"#f2c65d");beep(360,.08,"triangle",.025);renderCharacterPanel();saveGame(true);}
+  function sellValue(item){const qi=QUALITIES.findIndex(q=>q.id===item.quality)+1;return Math.max(10,Math.round(item.level*qi*5*(1+item.enhance*.35)));}
+  function sellItem(id){const inv=game.save.equipment.inventory,idx=inv.findIndex(i=>i.id===id);if(idx<0)return;const item=inv[idx],value=sellValue(item);inv.splice(idx,1);game.save.currencies.gold+=value;toast(`出售 ${item.name}，获得 ${value} 金币`,"#f2c65d");beep(360,.08,"triangle",.025);renderCharacterPanel();saveGame(true);}
+  function sellQuality(quality){const inv=game.save.equipment.inventory,items=inv.filter(item=>item.quality===quality);if(!items.length)return toast("该品质没有可出售装备");const value=items.reduce((sum,item)=>sum+sellValue(item),0),ids=new Set(items.map(item=>item.id));game.save.equipment.inventory=inv.filter(item=>!ids.has(item.id));game.inventoryPage=Math.min(game.inventoryPage,Math.max(0,Math.ceil(game.save.equipment.inventory.length/INVENTORY_PAGE_SIZE)-1));game.save.currencies.gold+=value;toast(`批量出售 ${items.length} 件装备，获得 ${value} 金币`,"#f2c65d");beep(410,.13,"triangle",.035);renderCharacterPanel();saveGame(true);}
 
   function renderSkills() {
     $("sp-text").textContent=game.save.player.skillPoints;const type=equippedWeaponType(),names={sword:"回旋星斩：环身一周击退全部近敌",spear:"贯星突阵：沿瞄准方向穿透冲锋",axe:"陨星震击：大范围重击并强力击退",staff:"五芒散射：发射五枚可穿透星弹",daggers:"瞬影双杀：闪现后连续斩击"};$("active-skills").innerHTML=`<article class="active-skill" data-key="R"><strong>${WEAPON_NAMES[type]}专属战技</strong><p>${names[type]}。消耗 28 耐力，5.2 秒冷却。</p></article><article class="active-skill" data-key="F"><strong>星爆术</strong><p>引爆周身星力并发射十二道星屑。消耗 45 耐力，9 秒冷却。</p></article>`;const root=$("skill-trees");root.innerHTML="";
@@ -1411,7 +1475,13 @@
     if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Tab"].includes(e.code))e.preventDefault();game.keys.add(e.code);if(e.repeat)return;
     if(["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.code)){const now=performance.now(),last=game.player.lastTap[e.code]||0;if(last&&now-last<285){game.player.runKey=e.code;game.player.runUntil=now+10000;}game.player.lastTap[e.code]=now;}
     if(e.code==="Escape")return togglePause();if(game.scene==="title")return;
-    if(e.code==="KeyC"||e.code==="KeyI"||e.code==="Tab")return isModalOpen()?closeAllModals():openPanel("character-panel");
+    if(e.code==="Tab"){
+      if(!$("map-panel").classList.contains("hidden"))return closePanel("map-panel");
+      if(isModalOpen())closeAllModals();
+      if(game.scene==="expedition")return openPanel("map-panel");
+      return toast("区域地图会在进入远征后开放；营地请按 M 查看大陆");
+    }
+    if(e.code==="KeyC"||e.code==="KeyI")return isModalOpen()?closeAllModals():openPanel("character-panel");
     if(e.code==="KeyK")return isModalOpen()?closeAllModals():openPanel("skills-panel");
     if(e.code==="KeyM"&&game.scene==="camp")return openPanel("continent-panel");
     if(e.code==="KeyB"){if(game.scene==="camp")openPanel("forge-panel");else toast("铁匠铺只在星火营地开放");return;}
@@ -1424,7 +1494,8 @@
     $("new-game-btn").addEventListener("click",startNewGame);$("continue-btn").addEventListener("click",continueGame);updateTitleSaveMeta();setMusicTheme("title");
     document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closePanel(b.dataset.close)));
     $("skills-btn").addEventListener("click",()=>openPanel("skills-panel"));$("resume-btn").addEventListener("click",()=>closePanel("pause-panel"));$("save-btn").addEventListener("click",()=>saveGame(false));$("pause-save-list-btn").addEventListener("click",()=>openPanel("save-panel"));
-    $("inventory-btn").addEventListener("click",()=>openPanel("character-panel"));$("skill-dock-btn").addEventListener("click",()=>openPanel("skills-panel"));$("map-dock-btn").addEventListener("click",()=>game.scene==="camp"?openPanel("continent-panel"):toast(`${BIOMES[game.biome].name} · 深度 ${game.depth}/5：${BIOMES[game.biome].mechanic}`,BIOMES[game.biome].accent));
+    $("inventory-btn").addEventListener("click",()=>openPanel("character-panel"));$("skill-dock-btn").addEventListener("click",()=>openPanel("skills-panel"));$("map-dock-btn").addEventListener("click",()=>game.scene==="camp"?openPanel("continent-panel"):openPanel("map-panel"));
+    $("map-zoom-out").addEventListener("click",()=>setMapZoom(game.mapZoom-.5));$("map-zoom-in").addEventListener("click",()=>setMapZoom(game.mapZoom+.5));$("map-zoom-reset").addEventListener("click",()=>setMapZoom(1));worldMap.addEventListener("wheel",e=>{e.preventDefault();setMapZoom(game.mapZoom+(e.deltaY<0?.5:-.5));},{passive:false});
     $("save-list-btn").addEventListener("click",()=>openPanel("save-panel"));$("return-dock-btn").addEventListener("click",()=>enterCamp(false));$("return-camp-btn").addEventListener("click",()=>enterCamp(false));$("revive-btn").addEventListener("click",()=>enterCamp(false));
     document.querySelectorAll("[data-forge-tab]").forEach(b=>b.addEventListener("click",()=>{game.forgeTab=b.dataset.forgeTab;renderForge();}));
     addEventListener("keydown",handleKeyDown);addEventListener("keyup",e=>{game.keys.delete(e.code);if(game.player.runKey===e.code){game.player.runKey=null;game.player.running=false;}});addEventListener("blur",()=>{game.keys.clear();game.player.running=false;});
