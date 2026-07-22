@@ -48,6 +48,12 @@ for (let theme = 0; theme < 5; theme += 1) {
   assert.deepEqual(catalog.getDefinition(`boots_${theme}`).parts[0].source.subRect, [0, 0.72, 1, 0.28]);
 }
 
+for (const type of ["sword", "spear", "axe", "staff", "daggers"]) {
+  const weapon = catalog.getDefinition(`weapon_${type}`);
+  assert.equal(weapon.rotationMode, "weapon");
+  assert.equal(weapon.rotation, 45, `${type} source art must rotate +45 degrees onto the aim axis`);
+}
+
 const character = new PixelEquipment.Character({ id: "test", rig, direction: "down" });
 character.setAnimation("walk", { restart: true }).update(0.16);
 assert.equal(character.frameIndex, 1, "walk animation must advance to its second frame");

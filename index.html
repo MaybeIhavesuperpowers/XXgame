@@ -26,6 +26,7 @@
         <button id="inventory-btn" class="dock-inventory"><i class="dock-art"></i><span>背包</span><b id="bag-badge">0 / 120</b></button>
         <button id="skill-dock-btn" class="dock-skills"><i class="dock-art"></i><span>战技 / 天赋</span><b id="sp-badge">0</b></button>
         <button id="map-dock-btn" class="dock-map"><i class="dock-art"></i><span>星图</span></button>
+        <button id="forge-dock-btn" class="dock-forge"><i class="dock-art"></i><span>铁匠铺</span><b>B</b></button>
         <button id="save-list-btn" class="dock-save"><i class="dock-art"></i><span>存档</span><b>L</b></button>
         <button id="return-dock-btn" class="dock-return hidden"><i class="dock-art"></i><span>返回营地</span><b>T</b></button>
       </nav>
@@ -67,9 +68,10 @@
         <h1>像素纪元<br><span>五域远征</span></h1>
         <p class="tagline">从一把破旧铁剑开始，穿越迷雾、熔火、冰原、雷峰与深渊。</p>
         <div class="title-actions">
-          <button id="new-game-btn" class="primary">踏上远征</button>
-          <button id="continue-btn">继续存档</button>
+          <button id="new-game-btn" class="primary" disabled>踏上远征</button>
+          <button id="continue-btn" disabled>继续存档</button>
         </div>
+        <p id="boot-status" class="boot-status" role="status">正在校验并加载游戏资源…</p>
         <p id="save-meta" class="save-meta">尚无存档</p>
         <p class="tiny">WASD 行走 · 双击方向奔跑 · 鼠标 360° 瞄准 · R/F 主动战技 · F5 快速保存 · 首次点击后启用原创 BGM</p>
       </div>
@@ -203,13 +205,35 @@
         <button data-key="KeyE">E</button><button data-key="KeyR">技</button><button data-key="Space">闪</button><button data-key="KeyJ">斩</button>
       </div>
     </div>
+
+    <aside id="qa-panel" class="qa-panel hidden" aria-label="本地上线验收工具">
+      <header><strong>上线验收</strong><span id="qa-status">等待场景</span></header>
+      <div class="qa-row">
+        <label>区域<select id="qa-biome"></select></label>
+        <label>深度<select id="qa-depth"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+        <button id="qa-enter" data-testid="qa-enter">进入</button>
+      </div>
+      <div class="qa-grid">
+        <button id="qa-loadout" data-testid="qa-loadout">装备/背包样本</button>
+        <button id="qa-mob-fx" data-testid="qa-mob-fx">四种怪物招式</button>
+        <button id="qa-boss-fx" data-testid="qa-boss-fx">Boss 下一招</button>
+        <button id="qa-drops" data-testid="qa-drops">三类掉落</button>
+        <button id="qa-actions" data-testid="qa-actions">走跑攻受击序列</button>
+        <button id="qa-weapon" data-testid="qa-weapon">切换武器</button>
+        <button id="qa-hurt" data-testid="qa-hurt">角色受击</button>
+        <button id="qa-clear" data-testid="qa-clear">清场 / 星门</button>
+      </div>
+    </aside>
   </main>
+  <div id="orientation-notice" class="orientation-notice" role="status">
+    <span aria-hidden="true">↻</span><strong>请将设备横向旋转</strong><small>横屏可获得完整战斗视野和更大的触控按钮</small>
+  </div>
   <script src="src/equipment/SpriteSheet.js?v=1" defer></script>
   <script src="src/equipment/Equipment.js?v=2" defer></script>
   <script src="src/equipment/Character.js?v=1" defer></script>
   <script src="src/equipment/LayeredCharacterRenderer.js?v=2" defer></script>
   <script src="data/equipment/embedded-config.js?v=1" defer></script>
   <script src="src/equipment/EquipmentSystem.js?v=3" defer></script>
-  <script src="src/game.js?v=20260722-13" defer></script>
+  <script src="src/game.js?v=20260722-24" defer></script>
 </body>
 </html>

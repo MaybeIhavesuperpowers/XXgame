@@ -175,27 +175,27 @@
   },
   "items": [
     {
-      "id": "weapon_sword", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -45,
+      "id": "weapon_sword", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
       "zByDirection": { "up": -50 }, "tags": ["melee", "sword"],
       "parts": [{ "sheet": "wearable_equipment", "source": { "col": 0, "row": 2 }, "size": [54, 54], "origin": { "x": 0.18, "y": 0.83 } }]
     },
     {
-      "id": "weapon_spear", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -45,
+      "id": "weapon_spear", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
       "zByDirection": { "up": -50 }, "tags": ["melee", "spear"],
       "parts": [{ "sheet": "wearable_equipment", "source": { "col": 1, "row": 2 }, "size": [60, 60], "origin": { "x": 0.16, "y": 0.87 } }]
     },
     {
-      "id": "weapon_axe", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -45,
+      "id": "weapon_axe", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
       "zByDirection": { "up": -50 }, "tags": ["melee", "axe"],
       "parts": [{ "sheet": "wearable_equipment", "source": { "col": 2, "row": 2 }, "size": [56, 56], "origin": { "x": 0.2, "y": 0.83 } }]
     },
     {
-      "id": "weapon_staff", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -45,
+      "id": "weapon_staff", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
       "zByDirection": { "up": -50 }, "tags": ["ranged", "staff"],
       "parts": [{ "sheet": "wearable_equipment", "source": { "col": 3, "row": 2 }, "size": [58, 58], "origin": { "x": 0.18, "y": 0.87 } }]
     },
     {
-      "id": "weapon_daggers", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -45,
+      "id": "weapon_daggers", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
       "zByDirection": { "up": -50 }, "tags": ["melee", "daggers"],
       "parts": [{ "sheet": "wearable_equipment", "source": { "col": 4, "row": 2 }, "size": [48, 48], "origin": { "x": 0.5, "y": 0.72 } }]
     },

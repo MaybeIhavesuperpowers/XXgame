@@ -1,0 +1,9 @@
+{
+  "name": "pixel-era-five-realms",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node tests/equipment-system.test.cjs && node tests/project-integrity.test.cjs",
+    "check": "node --check src/game.js && node tests/equipment-system.test.cjs && node tests/project-integrity.test.cjs"
+  }
+}

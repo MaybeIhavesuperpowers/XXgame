@@ -69,6 +69,7 @@ button:focus-visible { outline: 3px solid #fff1a5; outline-offset: 3px; }
 .dock-art { grid-row:1/3; width:28px; height:28px; background:url("assets/sprites/equipment-atlas-v2.png?v=2") 0 50% / 500% 500% no-repeat; image-rendering:pixelated; filter:drop-shadow(0 2px 1px #000); }
 .dock-skills .dock-art { background-position:75% 0; }
 .dock-map .dock-art { background-image:url("assets/sprites/materials-atlas.png"); background-size:500% 400%; background-position:100% 100%; }
+.dock-forge .dock-art { background-position:50% 50%; }
 .dock-save .dock-art { background-position:50% 100%; }
 .dock-return .dock-art { background-image:url("assets/sprites/terrain-atlas.png"); background-size:500% 200%; background-position:50% 100%; }
 .dock-map span { grid-row:1/3; }
@@ -97,6 +98,8 @@ button:disabled { cursor: not-allowed; filter: grayscale(1) brightness(.6); }
 button.primary { color: #241707; border-color: #ffe29a; background: linear-gradient(#ffd878,#c9872e); }
 button.danger { color: #ffd8d8; border-color: #80444a; background: linear-gradient(#512731,#321b23); }
 .tiny { margin-top: 20px; color: #888393; font-size: 11px; }
+.boot-status { width:max-content;max-width:100%;margin:12px 0 -7px;color:#a9d9c3;font-size:11px;letter-spacing:.04em; }
+.boot-status.error { color:#ff8d86; }
 .save-meta { width:max-content;max-width:100%;margin:12px 0 -8px;padding:6px 9px;color:#b9d9d0;background:rgba(8,10,16,.72);border-left:3px solid #d4af63;font-size:11px; }
 .title-seal { position: absolute; right: 4vw; bottom: 2vw; font-size: clamp(100px,17vw,280px); color: rgba(255,239,178,.08); }
 
@@ -240,3 +243,28 @@ button.danger { color: #ffd8d8; border-color: #80444a; background: linear-gradie
 .dpad [data-key="KeyW"]{grid-area:up}.dpad [data-key="KeyA"]{grid-area:left}.dpad [data-key="KeyS"]{grid-area:down}.dpad [data-key="KeyD"]{grid-area:right}
 .action-pad { position:absolute;right:20px;bottom:80px;display:flex;align-items:flex-end;gap:9px; }
 .action-pad [data-key="KeyJ"] { width:74px;height:74px;background:#702c35; }
+
+.qa-panel { position:absolute;right:10px;bottom:10px;z-index:100;width:330px;padding:8px;background:rgba(7,9,14,.96);border:2px solid #68c7a0;box-shadow:0 5px 18px #000;pointer-events:auto;font-size:10px; }
+.qa-panel header { display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;color:#a5f0ce; }
+.qa-panel header span { color:#aaa4ad;font-size:9px; }
+.qa-row { display:grid;grid-template-columns:1fr 74px 54px;gap:5px;align-items:end; }
+.qa-row label { display:grid;gap:2px;color:#aaa4ad; }
+.qa-row select { min-width:0;padding:4px;color:#fff;background:#191b23;border:1px solid #514c59;font-size:9px; }
+.qa-panel button { min-height:27px;padding:4px 6px;box-shadow:none;font-size:9px; }
+.qa-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:5px; }
+.orientation-notice { display:none;position:fixed;inset:0;z-index:200;align-content:center;justify-items:center;gap:10px;padding:36px;text-align:center;background:radial-gradient(circle at center,#20263a,#080910 70%);color:#f7e7b7; }
+.orientation-notice span { font-size:72px;line-height:1;color:#f2bd58;animation:rotate-hint 1.8s ease-in-out infinite; }
+.orientation-notice strong { font-size:22px; }
+.orientation-notice small { color:#aaa7b1;line-height:1.7; }
+@keyframes rotate-hint { 50% { transform:rotate(90deg); } }
+
+@media (max-width: 700px) and (orientation: portrait) {
+  .orientation-notice { display:grid; }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .mobile-controls button { width:84px;height:84px;font-size:24px; }
+  .dpad { left:26px;bottom:92px;width:254px;height:176px;grid-template-columns:repeat(3,84px); }
+  .action-pad { right:26px;bottom:92px;gap:14px; }
+  .action-pad [data-key="KeyJ"] { width:108px;height:108px; }
+}

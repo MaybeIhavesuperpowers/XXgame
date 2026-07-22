@@ -67,6 +67,7 @@
   }
 
   const SPRITE_PATHS = {
+    keyArt: "assets/pixel-era-key-art.png",
     heroBase: "assets/sprites/hero-base-layered-atlas.png?v=2", forest: "assets/sprites/forest-atlas.png",
     waste: "assets/sprites/waste-atlas.png", tundra: "assets/sprites/tundra-atlas.png",
     peaks: "assets/sprites/peaks-atlas.png", abyss: "assets/sprites/abyss-atlas.png",
@@ -79,7 +80,26 @@
     treantRoots: "assets/sprites/treant-root-vfx-v2.png?v=3", swordWave: "assets/sprites/sword-wave-v2.png?v=3"
   };
   const ART = {};
-  Object.entries(SPRITE_PATHS).forEach(([key, src]) => { const img = new Image(); img.src = src; ART[key] = img; });
+  Object.keys(SPRITE_PATHS).forEach(key => { const img = new Image(); img.decoding = "async"; ART[key] = img; });
+
+  function preloadArt() {
+    document.documentElement.dataset.artState = "loading";
+    document.documentElement.dataset.artFailures = "";
+    return Promise.all(Object.entries(SPRITE_PATHS).map(([key, src]) => new Promise((resolve, reject) => {
+      const image = ART[key];
+      image.onload = () => resolve({ key, width:image.naturalWidth, height:image.naturalHeight });
+      image.onerror = () => reject(new Error(`无法加载美术资源：${src}`));
+      image.src = src;
+    }))).then(results => {
+      document.documentElement.dataset.artState = "ready";
+      document.documentElement.dataset.artCount = String(results.length);
+      return results;
+    }).catch(error => {
+      document.documentElement.dataset.artState = "error";
+      document.documentElement.dataset.artFailures = error.message;
+      throw error;
+    });
+  }
 
   const ENEMY_ATTACKS = [
     [
@@ -387,6 +407,10 @@
     character.filter = p.hurtFx > 0 ? "brightness(1.6) saturate(.65)" : "none";
     syncVisualEquipment();
     if (deltaSeconds > 0) character.update(deltaSeconds);
+    if (p.swing && character.animation === "attack") {
+      const frames=character.framesFor(character.getAnimation(),character.direction),mapped=Math.min(frames.length-1,Math.floor(swingProgress*frames.length));
+      character.frameIndex=Math.max(0,mapped);
+    }
     const visualState = `${character.animation}:${character.frameIndex}:${character.equipmentList().length}`;
     if (document.documentElement.dataset.playerVisual !== visualState) document.documentElement.dataset.playerVisual = visualState;
     return character;
@@ -917,7 +941,10 @@
   }
 
   function interact() {
-    if (game.scene === "camp") return openPanel("continent-panel");
+    if (game.scene === "camp") {
+      if(Math.hypot(game.player.x-205,game.player.y-492)<145)return openPanel("forge-panel");
+      return openPanel("continent-panel");
+    }
     if (game.scene !== "expedition" || game.paused || isModalOpen()) return;
     const p = game.player;
     const drop=game.groundDrops.filter(d=>dist(d,p)<58).sort((a,b)=>dist(a,p)-dist(b,p))[0];
@@ -1259,7 +1286,7 @@
   const BIOME_ART_KEYS = ["forest","waste","tundra","peaks","abyss"];
   function drawAtlasCell(img,col,row,cols,rows,x,y,w,h,{flip=false,rotation=0,alpha=1,filter="none"}={}){
     if(!img?.complete||!img.naturalWidth)return false;const sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
-    ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.scale(flip?-1:1,1);ctx.globalAlpha*=alpha;ctx.filter=filter;ctx.drawImage(img,col*sw,row*sh,sw,sh,-w/2,-h/2,w,h);ctx.restore();return true;
+    const dw=Math.max(1,Math.round(w)),dh=Math.max(1,Math.round(h));ctx.save();ctx.imageSmoothingEnabled=false;ctx.translate(Math.round(x),Math.round(y));ctx.rotate(rotation);ctx.scale(flip?-1:1,1);ctx.globalAlpha*=alpha;ctx.filter=filter;ctx.drawImage(img,Math.round(col*sw),Math.round(row*sh),Math.round(sw),Math.round(sh),Math.round(-dw/2),Math.round(-dh/2),dw,dh);ctx.restore();return true;
   }
   function drawAtlasSubCell(img,col,row,cols,rows,subRect,x,y,w,h,{flip=false,rotation=0,alpha=1,filter="none",originX=.5,originY=.5}={}){
     if(!img?.complete||!img.naturalWidth)return false;const cellW=img.naturalWidth/cols,cellH=img.naturalHeight/rows,[sx,sy,sw,sh]=subRect;
@@ -1331,7 +1358,7 @@
     if(equipped.boots)drawAtlasSubCell(armorSheet,col,frameRow,4,rows,[0,.72,1,.28],p.x,p.y+14,82,29,{filter:themeFilter(equipped.boots.region)});
     if(equipped.helmet)drawAtlasCell(ART.wearableEquipment,clamp(equipped.helmet.region??0,0,4),0,5,3,p.x,p.y-48,36,36,{filter:flashFilter});
     if(equipped.amulet){ctx.save();ctx.globalAlpha=.24+.06*Math.sin(time*5);ctx.strokeStyle=BIOMES[equipped.amulet.region||0].accent;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y-22,30+Math.sin(time*4)*2,0,Math.PI*2);ctx.stroke();ctx.restore();}
-    if(equipped.weapon){const type=weaponTypeOf(equipped.weapon),weaponCol=Math.max(0,WEAPON_TYPES.indexOf(type)),swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,attackProgress):0,weaponAngle=angle+swingArc,handX=p.x+Math.cos(weaponAngle)*24,handY=p.y-23+Math.sin(weaponAngle)*24;drawAtlasCell(ART.wearableEquipment,weaponCol,2,5,3,handX,handY,type==="spear"?60:56,type==="spear"?60:56,{rotation:weaponAngle-Math.PI/4,filter:flashFilter});}
+    if(equipped.weapon){const type=weaponTypeOf(equipped.weapon),weaponCol=Math.max(0,WEAPON_TYPES.indexOf(type)),swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,attackProgress):0,weaponAngle=angle+swingArc,handX=p.x+Math.cos(weaponAngle)*24,handY=p.y-23+Math.sin(weaponAngle)*24;drawAtlasCell(ART.wearableEquipment,weaponCol,2,5,3,handX,handY,type==="spear"?60:56,type==="spear"?60:56,{rotation:weaponAngle+Math.PI/4,filter:flashFilter});}
   }
 
   function drawLayeredPlayer(p, time) {
@@ -1442,6 +1469,7 @@
     $("gold-text").textContent = fmt(game.save.currencies.gold); $("void-text").textContent = fmt(game.save.currencies.void); $("potion-text").textContent = `×${p.potions}`;
     $("bag-badge").textContent = game.unseenItems ? `+${game.unseenItems} · ${game.save.equipment.inventory.length}/${INVENTORY_CAPACITY}` : `${game.save.equipment.inventory.length} / ${INVENTORY_CAPACITY}`;
     $("inventory-btn").classList.toggle("has-new", game.unseenItems > 0);
+    $("forge-dock-btn")?.classList.toggle("hidden",game.scene!=="camp");
     $("return-dock-btn")?.classList.toggle("hidden",game.scene!=="expedition");
     $("sp-badge").textContent = game.save.player.skillPoints ? `${game.save.player.skillPoints} 点可用` : "0 点";
     if (game.scene === "camp") {
@@ -1648,6 +1676,7 @@
     document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closePanel(b.dataset.close)));
     $("skills-btn").addEventListener("click",()=>openPanel("skills-panel"));$("resume-btn").addEventListener("click",()=>closePanel("pause-panel"));$("save-btn").addEventListener("click",()=>saveGame(false));$("pause-save-list-btn").addEventListener("click",()=>openPanel("save-panel"));
     $("inventory-btn").addEventListener("click",()=>openPanel("character-panel"));$("skill-dock-btn").addEventListener("click",()=>openPanel("skills-panel"));$("map-dock-btn").addEventListener("click",()=>game.scene==="camp"?openPanel("continent-panel"):openPanel("map-panel"));
+    $("forge-dock-btn").addEventListener("click",()=>game.scene==="camp"?openPanel("forge-panel"):toast("铁匠铺只在星火营地开放"));
     $("map-zoom-out").addEventListener("click",()=>setMapZoom(game.mapZoom-.5));$("map-zoom-in").addEventListener("click",()=>setMapZoom(game.mapZoom+.5));$("map-zoom-reset").addEventListener("click",()=>setMapZoom(1));worldMap.addEventListener("wheel",e=>{e.preventDefault();setMapZoom(game.mapZoom+(e.deltaY<0?.5:-.5));},{passive:false});
     $("save-list-btn").addEventListener("click",()=>openPanel("save-panel"));$("return-dock-btn").addEventListener("click",()=>enterCamp(false));$("return-camp-btn").addEventListener("click",()=>enterCamp(false));$("revive-btn").addEventListener("click",()=>enterCamp(false));
     document.querySelectorAll("[data-forge-tab]").forEach(b=>b.addEventListener("click",()=>{game.forgeTab=b.dataset.forgeTab;renderForge();}));
@@ -1660,12 +1689,55 @@
 
   function resizeShell(){const shell=$("game-shell"),scale=Math.max(.1,Math.min(innerWidth/W,innerHeight/H)),scaledW=W*scale,scaledH=H*scale;shell.style.left=`${Math.max(0,(innerWidth-scaledW)/2)}px`;shell.style.top=`${Math.max(0,(innerHeight-scaledH)/2)}px`;shell.style.transform=`scale(${scale})`;}
 
+  function setupQaHarness() {
+    const localHost=["127.0.0.1","localhost","::1"].includes(location.hostname),requested=new URLSearchParams(location.search).has("qa");
+    if(!localHost||!requested)return;
+    const panel=$("qa-panel"),biomeSelect=$("qa-biome"),depthSelect=$("qa-depth");
+    let qaWeaponIndex=-1;
+    panel.classList.remove("hidden");document.documentElement.dataset.qaMode="enabled";
+    biomeSelect.innerHTML=BIOMES.map((b,i)=>`<option value="${i}">${i+1}. ${b.name}</option>`).join("");
+    const ensureExpedition=()=>{const biome=Number(biomeSelect.value)||0,depth=clamp(Number(depthSelect.value)||1,1,5);if(game.scene!=="expedition"||game.biome!==biome||game.depth!==depth)enterFloor(biome,depth);game.save.player.hp=stats().maxHp;game.player.statuses={};game.player.invuln=60;$("death-panel").classList.add("hidden");game.paused=false;return{biome,depth};};
+    const qaItem=(slot,index,region=0)=>{const weaponType=WEAPON_TYPES[index%WEAPON_TYPES.length],item=generateItem(region,5,Math.min(4,index%5),new RNG(`qa-${slot}-${index}-${region}`));item.id=`qa-${slot}-${index}-${region}`;item.slot=slot;item.region=region;item.enhance=index%10;item.quality=QUALITIES[index%QUALITIES.length].id;if(slot==="weapon"){item.weaponType=weaponType;item.name=`验收${WEAPON_NAMES[weaponType]}`;item.main={type:"attack",value:28+region*8+index};}else{item.name=`验收${SLOT_NAMES[slot]} ${index+1}`;item.main={type:slot==="amulet"?"maxHp":"defense",value:slot==="amulet"?55+index:14+region*4+index};}return item;};
+    const updateQaStatus=()=>{const living=game.enemies.filter(e=>!e.dead).length,exit=game.world?.exit,exitDistance=exit?Math.round(Math.hypot((exit.x+.5)*TILE-game.player.x,(exit.y+.5)*TILE-game.player.y)):null,status=`${game.scene==="expedition"?`${game.biome+1}-${game.depth}`:game.scene} · 敌${living} · 弹${game.projectiles.length} · 预警${game.telegraphs.length} · 特效${game.impacts.length}`;$("qa-status").textContent=status;document.documentElement.dataset.qaSnapshot=JSON.stringify({scene:game.scene,biome:game.biome,depth:game.depth,living,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length,drops:game.groundDrops.length,inventory:game.save.equipment.inventory.length,visual:document.documentElement.dataset.playerVisual||"",exitDistance,exitLocked:game.world?.exitLocked??null});};
+    $("qa-enter").onclick=()=>{const {biome,depth}=ensureExpedition();document.documentElement.dataset.qaLast=`stage:${biome}:${depth}`;updateQaStatus();};
+    $("qa-loadout").onclick=()=>{
+      if(game.scene==="title")startNewGame();game.save.progress.unlocked=[0,1,2,3,4];Object.keys(game.save.materials).forEach(key=>game.save.materials[key]=99);game.save.currencies.gold=99999;game.save.currencies.void=99;game.save.player.skillPoints=12;
+      const slots=Object.keys(SLOT_NAMES),region=Number(biomeSelect.value)||0;game.save.equipment.equipped={weapon:qaItem("weapon",4,region),helmet:qaItem("helmet",4,region),armor:qaItem("armor",4,region),boots:qaItem("boots",4,region),amulet:qaItem("amulet",4,region)};game.save.equipment.inventory=Array.from({length:68},(_,i)=>qaItem(slots[i%slots.length],i, i%5));game.visualEquipmentSignature="";game.unseenItems=game.save.equipment.inventory.length;game.save.player.hp=stats().maxHp;updateHUD();if(!$("character-panel").classList.contains("hidden"))renderCharacterPanel();document.documentElement.dataset.qaLast="loadout";updateQaStatus();toast("验收装备、五品质背包和全部材料已就绪","#a5f0ce");
+    };
+    $("qa-mob-fx").onclick=()=>{ensureExpedition();game.enemies=[];game.projectiles=[];game.telegraphs=[];game.impacts=[];game.player.invuln=60;const attacks=[];for(let i=0;i<4;i++){const angle=i/4*Math.PI*2;spawnEnemy(i,game.player.x+Math.cos(angle)*60,game.player.y+Math.sin(angle)*60,false);const e=game.enemies[game.enemies.length-1];if(i===0&&!e.elite){e.elite=true;e.name=`精英·${e.name}`;e.hp=e.maxHp=Math.round(e.maxHp*1.75);}e.pendingAttack=e.attack.id;e.targetX=game.player.x;e.targetY=game.player.y;performEnemyAttack(e);attacks.push(e.attack.id);}document.documentElement.dataset.qaLastEffect=JSON.stringify({kind:"mobs",biome:game.biome,attacks,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length});updateQaStatus();};
+    $("qa-boss-fx").onclick=()=>{ensureExpedition();game.projectiles=[];game.telegraphs=[];game.impacts=[];let boss=game.enemies.find(e=>e.boss&&!e.dead);game.enemies=game.enemies.filter(e=>e===boss);if(!boss){spawnEnemy(0,game.player.x+150,game.player.y,true);boss=game.enemies[game.enemies.length-1];}const pattern=boss.pattern%4;game.player.invuln=60;bossSpecial(boss);document.documentElement.dataset.qaLastEffect=JSON.stringify({kind:"boss",biome:game.biome,pattern,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length});updateQaStatus();};
+    $("qa-drops").onclick=()=>{ensureExpedition();const b=BIOMES[game.biome],p=game.player;game.groundDrops=[];spawnGroundDrop("equipment",p.x-18,p.y,{item:qaItem("weapon",game.biome,game.biome)});spawnGroundDrop("material",p.x,p.y-18,{material:b.rare,amount:2});spawnGroundDrop("potion",p.x+18,p.y);document.documentElement.dataset.qaLast="drops";updateQaStatus();};
+    $("qa-actions").onclick=()=>{ensureExpedition();const report={walk:[],run:[],attack:[],hurt:[]},sample=key=>report[key].push(document.documentElement.dataset.playerVisual||""),moves=[{code:"KeyD",dx:1,dy:0},{code:"KeyA",dx:-1,dy:0},{code:"KeyS",dx:0,dy:1},{code:"KeyW",dx:0,dy:-1}];let move=moves[0];if(game.world){const s=game.world.start;game.player.x=(s.x+.5)*TILE;game.player.y=(s.y+.5)*TILE;move=moves.find(m=>game.world.tiles[s.y+m.dy]?.[s.x+m.dx]!==0)||move;}game.player.vx=game.player.vy=0;setPlayerAim(move.dx,move.dy);game.player.invuln=0;game.player.swing=null;game.player.runKey=null;game.keys.add(move.code);let elapsed=0;const timer=setInterval(()=>{elapsed+=60;if(elapsed<=480)sample("walk");else if(elapsed===540){game.player.runKey=move.code;game.player.runUntil=performance.now()+900;}else if(elapsed<=1020)sample("run");else if(elapsed===1080){game.keys.delete(move.code);game.player.running=false;game.player.attackCd=0;attack(true);syncLayeredPlayerVisual(0);sample("attack");}else if(elapsed<=1440)sample("attack");else if(elapsed===1500){game.player.invuln=0;damagePlayer(Math.max(8,stats().maxHp*.12),game.player.x-50,game.player.y);}else if(elapsed<=1800)sample("hurt");else{clearInterval(timer);game.keys.delete(move.code);document.documentElement.dataset.qaActionReport=JSON.stringify(report);document.documentElement.dataset.qaLast="actions-complete";updateQaStatus();}},60);};
+    $("qa-weapon").onclick=()=>{ensureExpedition();qaWeaponIndex=(qaWeaponIndex+1)%WEAPON_TYPES.length;const type=WEAPON_TYPES[qaWeaponIndex],item=qaItem("weapon",qaWeaponIndex,game.biome);item.weaponType=type;item.name=`验收${WEAPON_NAMES[type]}`;game.save.equipment.equipped.weapon=item;game.visualEquipmentSignature="";game.enemies=[];game.projectiles=[];game.telegraphs=[];game.impacts=[];spawnEnemy(0,game.player.x+60,game.player.y,false);game.player.attackCd=0;game.player.activeCd1=0;game.player.activeCd2=0;game.save.player.stamina=100;setPlayerAim(1,0);syncVisualEquipment();document.documentElement.dataset.qaLast=`weapon:${type}`;updateQaStatus();};
+    $("qa-hurt").onclick=()=>{ensureExpedition();game.player.invuln=0;damagePlayer(Math.max(8,stats().maxHp*.12),game.player.x-50,game.player.y);document.documentElement.dataset.qaLast="hurt";updateQaStatus();};
+    $("qa-clear").onclick=()=>{ensureExpedition();const living=game.enemies.filter(e=>!e.dead);if(!living.length&&game.world?.exit&&!game.world.exitLocked){const before=`${game.biome}:${game.depth}`,exit=game.world.exit;game.groundDrops=[];game.player.x=(exit.x+.5)*TILE;game.player.y=(exit.y+.5)*TILE;interact();document.documentElement.dataset.qaLast=`portal:${before}->${game.scene}:${game.biome}:${game.depth}`;updateQaStatus();return;}game.projectiles=[];game.telegraphs=[];game.player.statuses={};game.player.invuln=60;living.slice().forEach(killEnemy);document.documentElement.dataset.qaLast=`clear:${Boolean(game.world?.exitSpawned)}`;updateQaStatus();};
+    setInterval(updateQaStatus,300);updateQaStatus();
+  }
+
   async function bootGame() {
-    try { await initializeEquipmentRendering(); }
-    catch (error) { console.error("Layered equipment renderer failed to initialize; using the clean base-character emergency renderer.", error);document.documentElement.dataset.equipmentRenderer="layered-unavailable"; }
+    document.documentElement.dataset.bootState = "loading";
+    const bootStatus=$("boot-status");
+    try {
+      const [, equipmentResult] = await Promise.all([
+        preloadArt(),
+        initializeEquipmentRendering().then(() => true).catch(error => {
+          console.error("Layered equipment renderer failed to initialize; using the clean base-character emergency renderer.", error);
+          document.documentElement.dataset.equipmentRenderer="layered-unavailable";
+          return false;
+        })
+      ]);
+      document.documentElement.dataset.bootState = "ready";
+      document.documentElement.dataset.bootRenderer = equipmentResult ? "layered" : "emergency";
+      if(bootStatus)bootStatus.textContent=equipmentResult?"资源加载完成 · 分层装备系统就绪":"资源加载完成 · 已启用兼容渲染模式";
+    } catch (error) {
+      console.error("Required game art failed to load.", error);
+      document.documentElement.dataset.bootState = "error";
+      if(bootStatus){bootStatus.textContent="资源加载失败，请刷新页面重试";bootStatus.classList.add("error");}
+      return;
+    }
     addEventListener("resize",resizeShell);resizeShell();
     if(matchMedia("(pointer: coarse)").matches)$("mobile-controls").classList.remove("hidden");
-    setupEvents();updateHUD();requestAnimationFrame(loop);
+    setupEvents();setupQaHarness();$("new-game-btn").disabled=false;updateTitleSaveMeta();updateHUD();requestAnimationFrame(loop);
   }
 
   bootGame();
