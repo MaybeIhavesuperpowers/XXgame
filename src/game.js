@@ -67,13 +67,11 @@
   }
 
   const SPRITE_PATHS = {
-    hero: "assets/sprites/hero-atlas.png", forest: "assets/sprites/forest-atlas.png",
+    heroBase: "assets/sprites/hero-base-layered-atlas.png?v=2", forest: "assets/sprites/forest-atlas.png",
     waste: "assets/sprites/waste-atlas.png", tundra: "assets/sprites/tundra-atlas.png",
     peaks: "assets/sprites/peaks-atlas.png", abyss: "assets/sprites/abyss-atlas.png",
-    equipment: "assets/sprites/equipment-atlas.png", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas.png",
-    terrain: "assets/sprites/terrain-atlas.png", heroDirectional: "assets/sprites/hero-directional-atlas.png?v=2",
-    heroRun: "assets/sprites/hero-run-atlas-v2.png?v=3", heroWalk: "assets/sprites/hero-walk-atlas-v3.png?v=4",
-    modularParts: "assets/sprites/hero-modular-parts-v3.png?v=4", equipmentLayers: "assets/sprites/hero-equipment-layers-v2.png?v=3",
+    equipment: "assets/sprites/equipment-atlas-v2.png?v=2", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas.png",
+    terrain: "assets/sprites/terrain-atlas.png",
     eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas.png?v=2",
     treantRoots: "assets/sprites/treant-root-vfx-v2.png?v=3", swordWave: "assets/sprites/sword-wave-v2.png?v=3"
   };
@@ -268,7 +266,7 @@
     enemies: [], particles: [], numbers: [], telegraphs: [], projectiles: [], impacts: [], resources: [], altars: [], groundDrops: [],
     screenShake: 0, hitStop: 0, lastTime: 0, autosave: 0, zoneTime: 0, hazardTimer: 2.5, unseenItems: 0,
     forgeTab: "craft", selectedForge: null, inventoryPage: 0, mapZoom: 1, runLoot: { gold: 0, materials: 0, kills: 0 },
-    audio: null, equipmentSystem: null, playerVisual: null, visualEquipmentSignature: ""
+    audio: null, equipmentSystem: null, playerVisual: null, paperdollVisual: null, visualEquipmentSignature: ""
   };
 
   const $ = id => document.getElementById(id);
@@ -333,6 +331,7 @@
     });
     game.equipmentSystem = system;
     game.playerVisual = system.createCharacter("local-player", { x: game.player.x, y: game.player.y, direction: "down" });
+    game.paperdollVisual = system.createCharacter("paperdoll-player", { x: 90, y: 168, direction: "down" });
     game.visualEquipmentSignature = "";
     document.documentElement.dataset.equipmentRenderer = "layered-anchor-v1";
   }
@@ -354,9 +353,11 @@
     const definitions = visualEquipmentDefinitions();
     const signature = definitions.map(([definitionId, item]) => `${definitionId}:${item.id}`).join("|");
     if (signature === game.visualEquipmentSignature) return;
-    character.clearEquipment();
-    definitions.forEach(([definitionId, item]) => {
-      if (system.catalog.has(definitionId)) character.equip(system.createEquipment(definitionId, { instanceId: item.id, stats: item.main }));
+    [character, game.paperdollVisual].filter(Boolean).forEach(target => {
+      target.clearEquipment();
+      definitions.forEach(([definitionId, item]) => {
+        if (system.catalog.has(definitionId)) target.equip(system.createEquipment(definitionId, { instanceId: item.id, stats: item.main }));
+      });
     });
     game.visualEquipmentSignature = signature;
   }
@@ -383,6 +384,36 @@
     syncVisualEquipment();
     if (deltaSeconds > 0) character.update(deltaSeconds);
     return character;
+  }
+
+  function renderPaperdoll(deltaSeconds = 0) {
+    const canvas = $("paperdoll-canvas"), character = game.paperdollVisual, system = game.equipmentSystem;
+    if (!canvas) return;
+    const paperCtx = canvas.getContext("2d");
+    paperCtx.setTransform(1, 0, 0, 1, 0, 0);
+    paperCtx.clearRect(0, 0, canvas.width, canvas.height);
+    paperCtx.imageSmoothingEnabled = false;
+    if (!character || !system) {
+      if (ART.heroBase?.complete && ART.heroBase.naturalWidth) {
+        const sw = ART.heroBase.naturalWidth / 4, sh = ART.heroBase.naturalHeight / 5;
+        paperCtx.drawImage(ART.heroBase, sw, 0, sw, sh, 49, 54, 82, 102);
+      }
+      return;
+    }
+    syncVisualEquipment();
+    const bob = Math.round(Math.sin(performance.now() / 360));
+    character.setPosition(90, 168 + bob).setDirection("down").setAnimation("idle");
+    character.pose.aimAngle = Math.PI / 2;
+    character.pose.weaponAngle = Math.PI / 2;
+    character.alpha = 1;
+    character.filter = "none";
+    if (deltaSeconds > 0) character.update(deltaSeconds);
+    paperCtx.save();
+    paperCtx.translate(90, 171);
+    paperCtx.scale(1.55, 1.55);
+    paperCtx.translate(-90, -168);
+    system.renderer.render(paperCtx, character);
+    paperCtx.restore();
   }
 
   function materialCoords(key) {
@@ -1227,12 +1258,6 @@
   function drawBiomeObject(col,x,y,size,opts={}){return drawAtlasCell(ART[BIOME_ART_KEYS[game.biome]],col,1,5,2,x,y,size,size,opts);}
   function drawEffect(index,x,y,size,opts={}){return drawAtlasCell(ART.effects,index%5,Math.floor(index/5),5,3,x,y,size,size,opts);}
   function drawMonsterEffect(col,row,x,y,size,opts={}){return drawAtlasCell(ART.monsterEffects,col,row,5,4,x,y,size,size,opts);}
-  function drawEquipmentLayer(col,row,x,y,w,h,opts={}){return drawAtlasCell(ART.equipmentLayers,col,row,5,4,x,y,w,h,opts);}
-  function drawModularPart(col,row,x,y,w,h,opts={}){return drawAtlasCell(ART.modularParts,col,row,5,5,x,y,w,h,opts);}
-  function drawModularHalf(col,row,half,x,y,w,h,{flip=false,rotation=0,alpha=1,filter="none"}={}){
-    const img=ART.modularParts;if(!img?.complete||!img.naturalWidth)return false;const sw=img.naturalWidth/5,sh=img.naturalHeight/5,sourceWidth=sw/2;
-    ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.scale(flip?-1:1,1);ctx.globalAlpha*=alpha;ctx.filter=filter;ctx.drawImage(img,col*sw+half*sourceWidth,row*sh,sourceWidth,sh,-w/2,-h/2,w,h);ctx.restore();return true;
-  }
   function drawTreantEffect(frame,x,y,w,h,opts={}){return drawAtlasCell(ART.treantRoots,clamp(frame,0,3),0,4,1,x,y,w,h,opts);}
   function drawSwordWave(x,y,size,opts={}){return drawAtlasCell(ART.swordWave,0,0,1,1,x,y,size,size,opts);}
 
@@ -1273,7 +1298,14 @@
 
   function drawPlayer(p, time) {
     if (game.equipmentSystem && game.playerVisual) return drawLayeredPlayer(p, time);
-    return drawPlayerLegacy(p, time);
+    return drawPlayerEmergency(p);
+  }
+
+  function drawPlayerEmergency(p) {
+    const angle = Number.isFinite(p.aimAngle) ? p.aimAngle : Math.atan2(p.dirY, p.dirX);
+    const ax = Math.cos(angle), ay = Math.sin(angle);
+    const col = Math.abs(ax) >= Math.abs(ay) ? (ax >= 0 ? 0 : 2) : (ay >= 0 ? 1 : 3);
+    drawAtlasCell(ART.heroBase, col, 0, 4, 5, Math.round(p.x), Math.round(p.y - 22), 82, 102, { filter:p.hurtFx > 0 ? "brightness(1.6) saturate(.65)" : "none" });
   }
 
   function drawLayeredPlayer(p, time) {
@@ -1296,32 +1328,6 @@
       const effectIndex = { burn:11, slow:12, poison:13, stun:14, charm:9 }[status];
       drawEffect(effectIndex, Math.round(p.x - 18 + index * 12), Math.round(p.y - 55), 25, { alpha:.82 });
     });
-  }
-
-  function drawPlayerLegacy(p, time) {
-    const type=equippedWeaponType(),speed=Math.hypot(p.vx,p.vy),moving=speed>12,locomoting=moving&&!p.swing&&p.recoveryPose<=0,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):(Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX)),ax=Math.cos(angle),ay=Math.sin(angle),dirCol=Math.abs(ax)>=Math.abs(ay)?(ax>=0?0:2):(ay>=0?1:3),running=locomoting&&p.running,runFrame=Math.floor(time*12)%4,walkFrame=Math.floor(time*7)%2,frame=running?runFrame:walkFrame,cycle=running?12:moving?7:2.5;
-    const bob=p.dash>0?0:running?[0,-2,0,2][runFrame]:moving?(walkFrame?-1.2:1.2):Math.sin(time*cycle),stride=running?[-3.2,0,3.2,0][runFrame]:(moving?(walkFrame?-1.8:1.8):0),armSwing=-stride*.72,tilt=moving?Math.sin(time*cycle)*.014:0,equipped=game.save.equipment.equipped,layerFlip=dirCol===2,backAlpha=dirCol===3?.78:1,flashFilter=p.hurtFx>0?"brightness(1.6) saturate(.65)":"none";
-    const blinkAlpha=p.invuln>0&&Math.floor(time*18)%2?.46:1;ctx.save();ctx.globalAlpha=blinkAlpha;
-    if(equipped.amulet){const c=BIOMES[equipped.amulet.region||0].accent;ctx.globalAlpha=blinkAlpha*(.18+.05*Math.sin(time*5));ctx.fillStyle=c;ctx.beginPath();ctx.arc(p.x,p.y-19,35+Math.sin(time*4)*2,0,Math.PI*2);ctx.fill();ctx.globalAlpha=blinkAlpha;}
-
-    // The silhouette is the undersuit. Every visible equipped area below is a separately animated node.
-    const bodyOpts={rotation:tilt,filter:flashFilter};
-    if(running)drawAtlasCell(ART.heroRun,dirCol,runFrame,4,4,p.x,p.y-22+bob,82,102,bodyOpts);
-    else if(locomoting)drawAtlasCell(ART.heroWalk,dirCol,walkFrame,4,2,p.x,p.y-22+bob,82,102,bodyOpts);
-    else drawAtlasCell(ART.heroDirectional,dirCol,p.swing?3:p.recoveryPose>0?4:0,4,5,p.x,p.y-22+bob,82,102,bodyOpts);
-
-    const region=item=>clamp(item?.region??0,0,4),facing={x:[1,0,-1,0][dirCol],y:[0,1,0,-1][dirCol]},side={x:-facing.y,y:facing.x},feetY=p.y+8+bob,bodyX=p.x+facing.x*(running?1.4:0),bodyY=p.y-21+bob+(running?Math.abs(stride)*.12:0);
-    if(equipped.boots){const col=region(equipped.boots);drawModularHalf(col,3,0,p.x-8+facing.x*stride,feetY+facing.y*stride,18,27,{rotation:-tilt*2,alpha:.94*backAlpha,flip:layerFlip,filter:flashFilter});drawModularHalf(col,3,1,p.x+8-facing.x*stride,feetY-facing.y*stride,18,27,{rotation:tilt*2,alpha:.94*backAlpha,flip:layerFlip,filter:flashFilter});}
-    if(equipped.armor)drawModularPart(region(equipped.armor),2,bodyX,bodyY,51,51,{rotation:tilt,alpha:.96*backAlpha,flip:layerFlip,filter:flashFilter});
-    if(equipped.helmet)drawModularPart(region(equipped.helmet),0,p.x-facing.x*tilt*35,p.y-48+bob-Math.abs(stride)*.1,38,38,{rotation:-tilt*.55,alpha:.98*backAlpha,flip:layerFlip,filter:flashFilter});
-    if(equipped.amulet&&dirCol!==3)drawEquipmentLayer(region(equipped.amulet),3,p.x+facing.x*5,p.y-29+bob,18,18,{alpha:.96,flip:layerFlip});
-
-    const swingProgress=p.swing?clamp(1-p.swing.t/p.swing.max,0,1):.5,swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,swingProgress):0,weaponAngle=angle+swingArc,wax=Math.cos(weaponAngle),way=Math.sin(weaponAngle),socket=[{x:15,y:-23},{x:8,y:-19},{x:-15,y:-23},{x:7,y:-27}][dirCol],handX=p.x+socket.x,handY=p.y+socket.y+bob,offHandX=p.x-socket.x*.72+side.x*2,offHandY=p.y+socket.y+bob+side.y*2+armSwing*.36,gripDistance={sword:18,spear:24,axe:19,staff:23,daggers:14}[type]||18,weaponSize=type==="spear"?53:type==="axe"?50:46,weaponX=handX+wax*gripDistance,weaponY=handY+way*gripDistance;
-    if(equipped.armor){const col=region(equipped.armor),attackReach=p.swing?4:0;drawModularHalf(col,1,0,offHandX-facing.x*armSwing,offHandY-facing.y*armSwing,20,31,{rotation:-tilt*2,alpha:.97*backAlpha,flip:layerFlip,filter:flashFilter});drawModularHalf(col,1,1,handX+wax*attackReach,handY+way*attackReach,20,31,{rotation:p.swing?weaponAngle*.08:tilt*2,alpha:.99,flip:layerFlip,filter:flashFilter});}
-    if(equipped.weapon){const weaponRotation={sword:Math.PI/4,spear:Math.PI/4,axe:Math.PI*.75,staff:Math.PI/3,daggers:Math.PI/4}[type]||Math.PI/4;drawModularPart(Math.max(0,WEAPON_TYPES.indexOf(type)),4,weaponX,weaponY,weaponSize,weaponSize,{rotation:weaponAngle+weaponRotation,alpha:.99,filter:flashFilter});}
-    if(p.swing){const effectSize=(type==="axe"?105:type==="spear"?82:type==="staff"?72:76)+(p.swing.combo===3?18:0),effectDistance=gripDistance+weaponSize*.44,effectX=handX+wax*effectDistance,effectY=handY+way*effectDistance,offset={spear:Math.PI/4,axe:0,staff:Math.PI/4,daggers:2.5}[type]||0;if(type==="sword")drawSwordWave(effectX,effectY,effectSize,{rotation:weaponAngle,alpha:.82});else drawEffect(WEAPON_TYPES.indexOf(type),effectX,effectY,effectSize,{rotation:weaponAngle+offset,alpha:.78});}
-    ctx.restore();
-    const statuses=Object.keys(p.statuses||{});statuses.forEach((s,i)=>{const idx={burn:11,slow:12,poison:13,stun:14,charm:9}[s];drawEffect(idx,p.x-18+i*12,p.y-55,25,{alpha:.82});});
   }
 
   function drawTelegraph(t){const pct=1-t.life/t.max;ctx.save();ctx.globalAlpha=.16+pct*.48;ctx.fillStyle=t.color;ctx.strokeStyle=t.color;ctx.lineWidth=3;if(t.type==="circle"){ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(t.x,t.y,t.r*(.2+pct*.8),0,Math.PI*2);ctx.stroke();}else if(t.type==="line"){ctx.lineWidth=t.width*2;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();ctx.globalAlpha=.9;ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();if(t.specialFx==="treantRoots"){ctx.setLineDash([]);const angle=Math.atan2(t.y2-t.y,t.x2-t.x),length=Math.hypot(t.x2-t.x,t.y2-t.y),segments=Math.max(3,Math.ceil(length/88)),frame=Math.min(3,Math.floor(pct*4));for(let i=0;i<segments;i++){const q=(i+.5)/segments;drawTreantEffect(frame,lerp(t.x,t.x2,q),lerp(t.y,t.y2,q),length/segments*1.15,45+pct*14,{rotation:angle,alpha:.38+pct*.44});}}}else{ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.arc(t.x,t.y,t.range,t.angle-t.arc/2,t.angle+t.arc/2);ctx.closePath();ctx.fill();}ctx.restore();}
@@ -1394,7 +1400,9 @@
   function loop(now) {
     const raw = Math.min(.034, (now - game.lastTime) / 1000 || 0); game.lastTime = now;
     if (game.hitStop > 0) game.hitStop -= raw; else update(raw);
-    render(now); requestAnimationFrame(loop);
+    render(now);
+    if (!$("character-panel").classList.contains("hidden")) renderPaperdoll(raw);
+    requestAnimationFrame(loop);
   }
 
   function updateHUD() {
@@ -1505,7 +1513,7 @@
       const item = game.save.equipment.equipped[slot]; const node = document.createElement("div"); node.dataset.slot = slot; node.className = `equipment-slot ${item ? `quality-${item.quality}` : "empty"}`; node.innerHTML = item ? `${itemArtHTML(item)}<b>${item.name}</b><span>${item.main.type === "attack" ? "攻" : item.main.type === "defense" ? "防" : "命"} ${itemMainValue(item)}</span>` : `<span>${label}</span>`;
       if (item) { bindItemTooltip(node,item); node.addEventListener("click",()=>unequip(slot)); } equipment.append(node);
     });
-    const doll = $("paperdoll-hero"); if (doll) {const equipped=game.save.equipment.equipped,layers=[["helmet","head",0,equipped.helmet],["armor","hands",1,equipped.armor],["armor","body",2,equipped.armor],["boots","feet",3,equipped.boots],["weapon","weapon",4,equipped.weapon]];doll.innerHTML=layers.map(([slot,part,row,item])=>`<i class="doll-layer doll-${part}${item?"":" hidden"}" data-doll-slot="${slot}" style="--layer-row:${row};--layer-col:${item?(slot==="weapon"?Math.max(0,WEAPON_TYPES.indexOf(weaponTypeOf(item))):clamp(item.region??0,0,4)):0}"></i>`).join("");doll.classList.toggle("has-amulet",!!equipped.amulet);}
+    renderPaperdoll(0);
     const st = stats(); const rows = [
       ["攻击力",fmt(st.attack)],["防御力",fmt(st.defense)],["最大生命",fmt(st.maxHp)],["暴击率",formatStat("critRate",st.critRate)],
       ["暴击伤害",formatStat("critDamage",st.critDamage)],["攻击速度",formatStat("attackSpeed",st.attackSpeed-1)],["闪避率",formatStat("dodge",st.dodge)],
@@ -1628,7 +1636,7 @@
 
   async function bootGame() {
     try { await initializeEquipmentRendering(); }
-    catch (error) { console.error("Layered equipment renderer failed to initialize; using compatibility renderer.", error);document.documentElement.dataset.equipmentRenderer="legacy-fallback"; }
+    catch (error) { console.error("Layered equipment renderer failed to initialize; using the clean base-character emergency renderer.", error);document.documentElement.dataset.equipmentRenderer="layered-unavailable"; }
     addEventListener("resize",resizeShell);resizeShell();
     if(matchMedia("(pointer: coarse)").matches)$("mobile-controls").classList.remove("hidden");
     setupEvents();updateHUD();requestAnimationFrame(loop);

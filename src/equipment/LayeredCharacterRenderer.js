@@ -70,7 +70,11 @@
           || part.frames?.[character.animation]?.default
           || part.frames?.default?.[character.direction]
           || [];
-        const source = frames.length ? (frames[character.frameIndex % frames.length].source || frames[character.frameIndex % frames.length]) : part.source;
+        const frame = frames.length ? frames[character.frameIndex % frames.length] : null;
+        const frameSource = frame ? (frame.source || frame) : null;
+        const source = frame && typeof frameSource === "object"
+          ? { ...(part.source || {}), ...frameSource }
+          : frameSource || part.source;
         if (!source && part.kind !== "aura") return;
         const layer = part.layer || equipment.layer;
         const anchorName = part.anchor || equipment.definition.anchor || "bodyAnchor";
@@ -79,14 +83,15 @@
         commands.push({
           kind: part.kind || "sprite", layer,
           order: this.orderFor(layer, character.direction, equipment.definition, part),
-          sequence: 100 + index, sheet: part.sheet, source,
+          sequence: 100 + index, sheet: frame?.sheet || part.sheet, source,
           anchor: anchorName,
           offset: part.offset || { x: 0, y: 0 }, offsetSpace: part.offsetSpace || "anchor",
-          size: part.size || [32, 32], origin: part.origin || defaultOrigin,
+          size: frame?.size || part.size || [32, 32], origin: frame?.origin || part.origin || defaultOrigin,
           rotation: Number(part.rotation ?? equipment.definition.rotation ?? 0) * DEG_TO_RAD,
           rotationMode: part.rotationMode || equipment.definition.rotationMode || "anchor",
           flipX: Boolean(part.flipXByDirection?.[character.direction]),
-          alpha: part.alpha ?? 1, effect: part.effect || null
+          alpha: frame?.alpha ?? part.alpha ?? 1, effect: frame?.effect || part.effect || null,
+          filter: frame?.filter || part.filter || equipment.definition.filter || null
         });
       });
     }
@@ -112,10 +117,11 @@
       const y = Math.round(anchor.y + offset.y);
       if (command.kind === "aura") return this.drawEffect(ctx, { ...command, x, y, rotation });
       const sheet = this.registry.get(command.sheet);
+      const filters = [character.filter, command.filter].filter(filter => filter && filter !== "none").join(" ") || "none";
       sheet.draw(ctx, command.source, {
         x, y, width: command.size[0], height: command.size[1],
         originX: command.origin.x, originY: command.origin.y, rotation,
-        flipX: command.flipX, alpha: command.alpha
+        flipX: command.flipX, alpha: command.alpha, filter: filters
       });
     }
 

@@ -13,7 +13,7 @@
   });
 
   class Equipment {
-    constructor(config, instance = {}) {
+    constructor(config, instance = {}, animationSets = {}) {
       if (!config?.id) throw new Error("Equipment requires an id");
       if (!config.slot) throw new Error(`Equipment ${config.id} requires a slot`);
       if (!VALID_LAYERS.has(config.layer)) throw new Error(`Equipment ${config.id} has invalid layer ${config.layer}`);
@@ -26,6 +26,7 @@
       this.tags = Object.freeze([...(config.tags || [])]);
       this.stats = Object.freeze({ ...(instance.stats || {}) });
       this.tint = instance.tint || null;
+      this.animationSets = animationSets;
     }
 
     resolveParts(animation, direction) {
@@ -42,7 +43,12 @@
       return parts.map(part => {
         const partDirection = part.directions?.[direction] || {};
         const partAnimation = part.animations?.[animation] || {};
-        return mergePart(mergePart(mergePart(part, directionOverride), animationOverride), mergePart(partDirection, partAnimation));
+        const resolved = mergePart(mergePart(mergePart(part, directionOverride), animationOverride), mergePart(partDirection, partAnimation));
+        const animationSetId = resolved.animationSet || definition.animationSet;
+        return {
+          ...resolved,
+          frames: resolved.frames || (animationSetId ? this.animationSets[animationSetId] : null)
+        };
       });
     }
   }
@@ -50,6 +56,7 @@
   class EquipmentCatalog {
     constructor(config = {}) {
       this.version = config.version || 1;
+      this.animationSets = Object.freeze({ ...(config.animationSets || {}) });
       this.definitions = new Map();
       (config.items || []).forEach(item => {
         if (this.definitions.has(item.id)) throw new Error(`Duplicate equipment id: ${item.id}`);
@@ -68,7 +75,7 @@
     }
 
     create(id, instance = {}) {
-      return new Equipment(this.getDefinition(id), instance);
+      return new Equipment(this.getDefinition(id), instance, this.animationSets);
     }
 
     list(filter = {}) {

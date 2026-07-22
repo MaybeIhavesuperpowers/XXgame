@@ -42,6 +42,17 @@
         }
         });
       });
+      Object.entries(catalogConfig.animationSets || {}).forEach(([setId, animations]) => {
+        Object.entries(animations || {}).forEach(([animation, directions]) => {
+          Object.entries(directions || {}).forEach(([direction, frames]) => {
+            (frames || []).forEach((frame, index) => {
+              if (frame?.sheet && !registry.has(frame.sheet)) {
+                errors.push(`animationSets.${setId}.${animation}.${direction}[${index}] references unknown sheet ${frame.sheet}`);
+              }
+            });
+          });
+        });
+      });
       if (errors.length) throw new Error(`Invalid equipment configuration:\n${errors.join("\n")}`);
     }
 

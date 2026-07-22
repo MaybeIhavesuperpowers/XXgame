@@ -30,7 +30,7 @@ button:focus-visible { outline: 3px solid #fff1a5; outline-offset: 3px; }
 
 #hud { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .player-card { position: absolute; top: 12px; left: 12px; display: flex; width: 274px; padding: 6px; gap: 7px; }
-.portrait { width: 46px; height: 46px; flex: none; border: 2px solid #a67a3d; background: #141727 url("assets/sprites/hero-atlas.png") 0 0 / 500% 300% no-repeat; box-shadow: inset 0 0 0 2px #0a0c14; image-rendering: pixelated; }
+.portrait { width: 46px; height: 46px; flex: none; border: 2px solid #a67a3d; background: #141727 url("assets/sprites/hero-base-layered-atlas.png?v=2") 33.333% 0 / 400% 500% no-repeat; box-shadow: inset 0 0 0 2px #0a0c14; image-rendering: pixelated; }
 .status-stack { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .hud-row { display: flex; gap: 7px; align-items: center; white-space: nowrap; overflow: hidden; font-size: 10px; }
 .hud-row strong { color: var(--gold-2); }
@@ -66,7 +66,7 @@ button:focus-visible { outline: 3px solid #fff1a5; outline-offset: 3px; }
 .menu-dock button { min-width:78px; height:40px; padding:3px 6px; display:grid; grid-template-columns:28px 1fr; grid-template-rows:1fr 1fr; align-items:center; text-align:left; font-size:9px; }
 .menu-dock button > span { font-weight:900; color:#fff1c2; }
 .menu-dock button > b { color:#aaa4a8; font-size:9px; }
-.dock-art { grid-row:1/3; width:28px; height:28px; background:url("assets/sprites/equipment-atlas.png") 0 50% / 500% 500% no-repeat; image-rendering:pixelated; filter:drop-shadow(0 2px 1px #000); }
+.dock-art { grid-row:1/3; width:28px; height:28px; background:url("assets/sprites/equipment-atlas-v2.png?v=2") 0 50% / 500% 500% no-repeat; image-rendering:pixelated; filter:drop-shadow(0 2px 1px #000); }
 .dock-skills .dock-art { background-position:75% 0; }
 .dock-map .dock-art { background-image:url("assets/sprites/materials-atlas.png"); background-size:500% 400%; background-position:100% 100%; }
 .dock-save .dock-art { background-position:50% 100%; }
@@ -131,15 +131,7 @@ button.danger { color: #ffd8d8; border-color: #80444a; background: linear-gradie
 .character-layout { display: grid; grid-template-columns: 260px 220px 1fr; gap: 20px; margin-top: 18px; }
 .character-layout > div { min-width: 0; padding: 15px; background: rgba(0,0,0,.16); border: 1px solid var(--line); }
 .paperdoll { position: relative; min-height: 355px; display: grid; place-items: center; background: radial-gradient(circle,#364052 0,#161722 60%,#101019 100%); border: 1px solid #454150; }
-.pixel-hero { position: relative; width: 112px; height: 150px; background: url("assets/sprites/hero-atlas.png") calc(var(--weapon-col,0) * 25%) 0 / 500% 300% no-repeat; image-rendering:pixelated; filter: drop-shadow(0 8px 2px #050509); }
-.doll-layer { position:absolute;z-index:2;display:block;background-image:url("assets/sprites/hero-modular-parts-v3.png?v=4");background-position:calc(var(--layer-col,0) * 25%) calc(var(--layer-row,0) * 25%);background-size:500% 500%;background-repeat:no-repeat;image-rendering:pixelated;filter:drop-shadow(0 2px 1px #050509);pointer-events:none; }
-.doll-head { width:52px;height:52px;left:30px;top:5px;z-index:5; }
-.doll-hands { width:76px;height:76px;left:18px;top:43px;z-index:4; }
-.doll-body { width:72px;height:72px;left:20px;top:43px;z-index:3; }
-.doll-feet { width:58px;height:58px;left:27px;top:94px;z-index:2; }
-.doll-weapon { width:74px;height:74px;left:56px;top:43px;z-index:6;transform:rotate(-10deg); }
-.pixel-hero.has-amulet::after { content:"";position:absolute;inset:20px 8px 8px;border:2px solid rgba(219,163,255,.7);border-radius:50%;box-shadow:0 0 18px rgba(205,126,255,.45),inset 0 0 16px rgba(205,126,255,.18);animation:dollAura 1.8s ease-in-out infinite; }
-@keyframes dollAura { 50% { transform:scale(1.06);opacity:.62; } }
+.paperdoll-canvas { width:180px;height:220px;image-rendering:pixelated;filter:drop-shadow(0 8px 2px #050509);pointer-events:none; }
 .equipment-slot { position:absolute; width:64px; height:68px; display:grid;grid-template-columns:34px 1fr;place-items:center; background:#15151e; border:2px solid #4b4652; cursor:pointer; font-size:8px;text-align:center;padding:3px; }
 .equipment-slot[data-slot="helmet"]{top:15px;right:15px}.equipment-slot[data-slot="weapon"]{top:92px;left:12px}.equipment-slot[data-slot="armor"]{top:92px;right:12px}.equipment-slot[data-slot="boots"]{bottom:15px;left:12px}.equipment-slot[data-slot="amulet"]{bottom:15px;right:12px}
 .equipment-slot.empty { color:#706a75; }
@@ -163,7 +155,7 @@ button.danger { color: #ffd8d8; border-color: #80444a; background: linear-gradie
 .item-cell b { overflow:hidden;max-width:100%;white-space:nowrap;text-overflow:ellipsis; }
 .item-cell .plus { position:absolute;right:3px;bottom:2px;color:#ffe479;font-weight:900; }
 .sell-btn { position:absolute;right:2px;top:2px;z-index:3;padding:2px 4px;border-width:1px;box-shadow:none;background:#542b30;color:#ffd6bf;font-size:8px;line-height:1; }
-.item-art,.tooltip-art,.selected-art { display:block; width:42px; height:42px; background:url("assets/sprites/equipment-atlas.png") calc(var(--art-col) * 25%) calc(var(--art-row) * 25%) / 500% 500% no-repeat; image-rendering:pixelated; filter:drop-shadow(0 3px 1px #050509); }
+.item-art,.tooltip-art,.selected-art { display:block; width:42px; height:42px; background:url("assets/sprites/equipment-atlas-v2.png?v=2") calc(var(--art-col) * 25%) calc(var(--art-row) * 25%) / 500% 500% no-repeat; image-rendering:pixelated; filter:drop-shadow(0 3px 1px #050509); }
 .equipment-slot .item-art { width:34px;height:34px;grid-row:1/3; }
 .materials-list { display:grid;grid-template-columns:repeat(2,1fr);gap:5px;font-size:10px; }
 .material { display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:6px;padding:5px;background:#171720;border:1px solid #34313c; }

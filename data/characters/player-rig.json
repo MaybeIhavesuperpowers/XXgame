@@ -15,9 +15,9 @@
     "effect": 50
   },
   "spriteSheets": [
-    { "id": "hero_directional", "src": "../../assets/sprites/hero-base-layered-atlas.png?v=1", "columns": 4, "rows": 5 },
-    { "id": "hero_walk", "src": "../../assets/sprites/hero-base-walk-atlas.png?v=1", "columns": 4, "rows": 2 },
-    { "id": "hero_run", "src": "../../assets/sprites/hero-base-run-atlas.png?v=1", "columns": 4, "rows": 4 }
+    { "id": "hero_directional", "src": "../../assets/sprites/hero-base-layered-atlas.png?v=2", "columns": 4, "rows": 5 },
+    { "id": "hero_walk", "src": "../../assets/sprites/hero-base-walk-atlas.png?v=2", "columns": 4, "rows": 2 },
+    { "id": "hero_run", "src": "../../assets/sprites/hero-base-run-atlas.png?v=2", "columns": 4, "rows": 4 }
   ],
   "layers": [
     { "id": "body", "layer": "body", "animationSource": true },

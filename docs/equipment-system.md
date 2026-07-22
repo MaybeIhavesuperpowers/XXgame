@@ -7,7 +7,9 @@ assets/sprites/
   hero-base-layered-atlas.png           # imagegen 生成并去底的 4×5 基础动作
   hero-base-walk-atlas.png              # 4×2 两帧走路
   hero-base-run-atlas.png               # 4×4 四帧跑步
-  hero-modular-parts-v3.png             # 头盔/护甲/手臂/鞋/武器部件
+  armor-forest-overlay-*-v1.png         # 衣服/护甲逐帧覆盖层（方向、走、跑、攻击、受伤）
+  wearable-equipment-atlas-v1.png       # 新头盔、鞋与手持武器图层
+  equipment-atlas-v2.png                # 背包与地面掉落装备缩略图
 data/characters/player-rig.json         # 动画、四方向帧、逐帧锚点、渲染层级
 data/equipment/equipment-catalog.json   # 装备定义与部件裁切配置
 src/equipment/

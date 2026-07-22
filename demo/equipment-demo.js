@@ -26,6 +26,8 @@
       equipSelection("body", controls.armor.value);
       equipSelection("head", controls.helmet.value);
       const themeIndex = controls.armor.value ? Math.max(0, Number(controls.armor.value.slice(-1)) || 0) : null;
+      // Boots use the lower fitted region of the same animation template, so
+      // they can have an independent theme without becoming a rigid sticker.
       equipSelection("feet", themeIndex === null ? "" : `boots_${themeIndex}`);
       equipSelection("neck", themeIndex === null ? "" : `amulet_${themeIndex}`);
     };
