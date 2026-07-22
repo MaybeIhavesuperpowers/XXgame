@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "id": "starborn_player",
+  "defaultAnimation": "idle",
+  "renderSize": [82, 102],
+  "shadow": { "width": 40, "height": 12, "y": 13, "alpha": 0.28 },
+  "layerOrder": {
+    "shadow": -100,
+    "body": 0,
+    "hair": 10,
+    "armor": 20,
+    "shield": 25,
+    "helmet": 30,
+    "weapon": 40,
+    "effect": 50
+  },
+  "spriteSheets": [
+    { "id": "hero_directional", "src": "../../assets/sprites/hero-base-layered-atlas.png?v=1", "columns": 4, "rows": 5 },
+    { "id": "hero_walk", "src": "../../assets/sprites/hero-base-walk-atlas.png?v=1", "columns": 4, "rows": 2 },
+    { "id": "hero_run", "src": "../../assets/sprites/hero-base-run-atlas.png?v=1", "columns": 4, "rows": 4 }
+  ],
+  "layers": [
+    { "id": "body", "layer": "body", "animationSource": true },
+    { "id": "hair", "layer": "hair", "visible": false }
+  ],
+  "animations": {
+    "idle": {
+      "fps": 2,
+      "loop": true,
+      "directions": {
+        "right": [{ "sheet": "hero_directional", "source": { "col": 0, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }],
+        "down": [{ "sheet": "hero_directional", "source": { "col": 1, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }],
+        "left": [{ "sheet": "hero_directional", "source": { "col": 2, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }],
+        "up": [{ "sheet": "hero_directional", "source": { "col": 3, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }]
+      }
+    },
+    "walk": {
+      "fps": 7,
+      "loop": true,
+      "directions": {
+        "right": [{ "sheet": "hero_walk", "source": { "col": 0, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }, { "sheet": "hero_walk", "source": { "col": 0, "row": 1 }, "anchor": "bodyAnchor", "size": [82, 102] }],
+        "down": [{ "sheet": "hero_walk", "source": { "col": 1, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }, { "sheet": "hero_walk", "source": { "col": 1, "row": 1 }, "anchor": "bodyAnchor", "size": [82, 102] }],
+        "left": [{ "sheet": "hero_walk", "source": { "col": 2, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }, { "sheet": "hero_walk", "source": { "col": 2, "row": 1 }, "anchor": "bodyAnchor", "size": [82, 102] }],
+        "up": [{ "sheet": "hero_walk", "source": { "col": 3, "row": 0 }, "anchor": "bodyAnchor", "size": [82, 102] }, { "sheet": "hero_walk", "source": { "col": 3, "row": 1 }, "anchor": "bodyAnchor", "size": [82, 102] }]
+      }
+    },
+    "run": {
+      "fps": 12,
+      "loop": true,
+      "directions": {
+        "right": [{ "sheet": "hero_run", "source": { "col": 0, "row": 0 } }, { "sheet": "hero_run", "source": { "col": 0, "row": 1 } }, { "sheet": "hero_run", "source": { "col": 0, "row": 2 } }, { "sheet": "hero_run", "source": { "col": 0, "row": 3 } }],
+        "down": [{ "sheet": "hero_run", "source": { "col": 1, "row": 0 } }, { "sheet": "hero_run", "source": { "col": 1, "row": 1 } }, { "sheet": "hero_run", "source": { "col": 1, "row": 2 } }, { "sheet": "hero_run", "source": { "col": 1, "row": 3 } }],
+        "left": [{ "sheet": "hero_run", "source": { "col": 2, "row": 0 } }, { "sheet": "hero_run", "source": { "col": 2, "row": 1 } }, { "sheet": "hero_run", "source": { "col": 2, "row": 2 } }, { "sheet": "hero_run", "source": { "col": 2, "row": 3 } }],
+        "up": [{ "sheet": "hero_run", "source": { "col": 3, "row": 0 } }, { "sheet": "hero_run", "source": { "col": 3, "row": 1 } }, { "sheet": "hero_run", "source": { "col": 3, "row": 2 } }, { "sheet": "hero_run", "source": { "col": 3, "row": 3 } }]
+      }
+    },
+    "attack": {
+      "fps": 12,
+      "loop": false,
+      "directions": {
+        "right": [{ "sheet": "hero_directional", "source": { "col": 0, "row": 2 } }, { "sheet": "hero_directional", "source": { "col": 0, "row": 3 } }, { "sheet": "hero_directional", "source": { "col": 0, "row": 4 } }],
+        "down": [{ "sheet": "hero_directional", "source": { "col": 1, "row": 2 } }, { "sheet": "hero_directional", "source": { "col": 1, "row": 3 } }, { "sheet": "hero_directional", "source": { "col": 1, "row": 4 } }],
+        "left": [{ "sheet": "hero_directional", "source": { "col": 2, "row": 2 } }, { "sheet": "hero_directional", "source": { "col": 2, "row": 3 } }, { "sheet": "hero_directional", "source": { "col": 2, "row": 4 } }],
+        "up": [{ "sheet": "hero_directional", "source": { "col": 3, "row": 2 } }, { "sheet": "hero_directional", "source": { "col": 3, "row": 3 } }, { "sheet": "hero_directional", "source": { "col": 3, "row": 4 } }]
+      }
+    },
+    "hurt": {
+      "fps": 8,
+      "loop": false,
+      "directions": {
+        "right": [{ "sheet": "hero_directional", "source": { "col": 0, "row": 4 } }],
+        "down": [{ "sheet": "hero_directional", "source": { "col": 1, "row": 4 } }],
+        "left": [{ "sheet": "hero_directional", "source": { "col": 2, "row": 4 } }],
+        "up": [{ "sheet": "hero_directional", "source": { "col": 3, "row": 4 } }]
+      }
+    }
+  },
+  "anchors": {
+    "default": {
+      "right": {
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "leftHandAnchor": { "x": -11, "y": -23 }, "rightHandAnchor": { "x": 15, "y": -23 },
+        "backAnchor": { "x": -10, "y": -29 }, "leftFootAnchor": { "x": -8, "y": 8 }, "rightFootAnchor": { "x": 8, "y": 8 }
+      },
+      "down": {
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "leftHandAnchor": { "x": -9, "y": -19 }, "rightHandAnchor": { "x": 9, "y": -19 },
+        "backAnchor": { "x": 0, "y": -29 }, "leftFootAnchor": { "x": -8, "y": 8 }, "rightFootAnchor": { "x": 8, "y": 8 }
+      },
+      "left": {
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "leftHandAnchor": { "x": 11, "y": -23 }, "rightHandAnchor": { "x": -15, "y": -23 },
+        "backAnchor": { "x": 10, "y": -29 }, "leftFootAnchor": { "x": -8, "y": 8 }, "rightFootAnchor": { "x": 8, "y": 8 }
+      },
+      "up": {
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "leftHandAnchor": { "x": -7, "y": -27 }, "rightHandAnchor": { "x": 7, "y": -27 },
+        "backAnchor": { "x": 0, "y": -30 }, "leftFootAnchor": { "x": -7, "y": 8 }, "rightFootAnchor": { "x": 7, "y": 8 }
+      }
+    },
+    "animations": {
+      "idle": { "frames": [{ "all": {} }] },
+      "walk": {
+        "frames": [
+          { "all": { "bodyAnchor": { "y": 1 }, "headAnchor": { "y": 1 }, "backAnchor": { "y": 1 }, "leftHandAnchor": { "y": 1 }, "rightHandAnchor": { "y": -1 } }, "right": { "leftFootAnchor": { "x": -2 }, "rightFootAnchor": { "x": 2 } }, "left": { "leftFootAnchor": { "x": 2 }, "rightFootAnchor": { "x": -2 } }, "down": { "leftFootAnchor": { "y": -2 }, "rightFootAnchor": { "y": 2 } }, "up": { "leftFootAnchor": { "y": 2 }, "rightFootAnchor": { "y": -2 } } },
+          { "all": { "bodyAnchor": { "y": -1 }, "headAnchor": { "y": -1 }, "backAnchor": { "y": -1 }, "leftHandAnchor": { "y": -1 }, "rightHandAnchor": { "y": 1 } }, "right": { "leftFootAnchor": { "x": 2 }, "rightFootAnchor": { "x": -2 } }, "left": { "leftFootAnchor": { "x": -2 }, "rightFootAnchor": { "x": 2 } }, "down": { "leftFootAnchor": { "y": 2 }, "rightFootAnchor": { "y": -2 } }, "up": { "leftFootAnchor": { "y": -2 }, "rightFootAnchor": { "y": 2 } } }
+        ]
+      },
+      "run": {
+        "frames": [
+          { "all": { "bodyAnchor": { "y": 0 }, "headAnchor": { "y": 0 }, "leftHandAnchor": { "x": -2 }, "rightHandAnchor": { "x": 2 } } },
+          { "all": { "bodyAnchor": { "y": -2 }, "headAnchor": { "y": -2 }, "leftHandAnchor": { "y": 2 }, "rightHandAnchor": { "y": -2 }, "leftFootAnchor": { "y": -3 }, "rightFootAnchor": { "y": 3 } } },
+          { "all": { "bodyAnchor": { "y": 0 }, "headAnchor": { "y": 0 }, "leftHandAnchor": { "x": 2 }, "rightHandAnchor": { "x": -2 } } },
+          { "all": { "bodyAnchor": { "y": 2 }, "headAnchor": { "y": 2 }, "leftHandAnchor": { "y": -2 }, "rightHandAnchor": { "y": 2 }, "leftFootAnchor": { "y": 3 }, "rightFootAnchor": { "y": -3 } } }
+        ]
+      },
+      "attack": {
+        "frames": [
+          { "right": { "rightHandAnchor": { "x": -4, "y": -3 } }, "left": { "rightHandAnchor": { "x": 4, "y": -3 } }, "down": { "rightHandAnchor": { "x": -3, "y": -4 } }, "up": { "rightHandAnchor": { "x": 3, "y": 2 } } },
+          { "right": { "rightHandAnchor": { "x": 7, "y": 2 } }, "left": { "rightHandAnchor": { "x": -7, "y": 2 } }, "down": { "rightHandAnchor": { "x": 2, "y": 7 } }, "up": { "rightHandAnchor": { "x": -2, "y": -7 } } },
+          { "all": { "bodyAnchor": { "y": 1 }, "headAnchor": { "y": 1 } } }
+        ]
+      },
+      "hurt": { "frames": [{ "all": { "bodyAnchor": { "y": 3 }, "headAnchor": { "y": 3 }, "leftHandAnchor": { "y": 3 }, "rightHandAnchor": { "y": 3 } } }] }
+    }
+  }
+}

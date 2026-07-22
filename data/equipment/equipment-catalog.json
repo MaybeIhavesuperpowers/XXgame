@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "version": 1,
+  "spriteSheets": [
+    { "id": "modular_equipment", "src": "../../assets/sprites/hero-modular-parts-v3.png?v=5", "columns": 5, "rows": 5 }
+  ],
+  "items": [
+    {
+      "id": "weapon_sword", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "sprite": "hero-modular-parts-v3.png", "zByDirection": { "up": -50 }, "tags": ["melee", "sword"],
+      "parts": [{ "sheet": "modular_equipment", "source": { "col": 0, "row": 4 }, "offset": { "x": 0, "y": 0 }, "size": [46, 46], "origin": { "x": 0.16, "y": 0.86 } }]
+    },
+    {
+      "id": "weapon_spear", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "sprite": "hero-modular-parts-v3.png", "zByDirection": { "up": -50 }, "tags": ["melee", "spear"],
+      "parts": [{ "sheet": "modular_equipment", "source": { "col": 1, "row": 4 }, "offset": { "x": 0, "y": 0 }, "size": [53, 53], "origin": { "x": 0.18, "y": 0.89 } }]
+    },
+    {
+      "id": "weapon_axe", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 62,
+      "sprite": "hero-modular-parts-v3.png", "zByDirection": { "up": -50 }, "tags": ["melee", "axe"],
+      "parts": [{ "sheet": "modular_equipment", "source": { "col": 2, "row": 4 }, "offset": { "x": 0, "y": 0 }, "size": [50, 50], "origin": { "x": 0.17, "y": 0.91 } }]
+    },
+    {
+      "id": "weapon_staff", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 60,
+      "sprite": "hero-modular-parts-v3.png", "zByDirection": { "up": -50 }, "tags": ["ranged", "staff"],
+      "parts": [{ "sheet": "modular_equipment", "source": { "col": 3, "row": 4 }, "offset": { "x": 0, "y": 0 }, "size": [48, 48], "origin": { "x": 0.16, "y": 0.9 } }]
+    },
+    {
+      "id": "weapon_daggers", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "sprite": "hero-modular-parts-v3.png", "zByDirection": { "up": -50 }, "tags": ["melee", "daggers"],
+      "parts": [{ "sheet": "modular_equipment", "source": { "col": 4, "row": 4 }, "offset": { "x": 0, "y": 0 }, "size": [44, 44], "origin": { "x": 0.5, "y": 0.68 } }]
+    },
+
+    { "id": "helmet_0", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "sprite": "hero-modular-parts-v3.png", "parts": [{ "sheet": "modular_equipment", "source": { "col": 0, "row": 0 }, "size": [32, 32] }] },
+    { "id": "helmet_1", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "sprite": "hero-modular-parts-v3.png", "parts": [{ "sheet": "modular_equipment", "source": { "col": 1, "row": 0 }, "size": [32, 32] }] },
+    { "id": "helmet_2", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "sprite": "hero-modular-parts-v3.png", "parts": [{ "sheet": "modular_equipment", "source": { "col": 2, "row": 0 }, "size": [32, 32] }] },
+    { "id": "helmet_3", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "sprite": "hero-modular-parts-v3.png", "parts": [{ "sheet": "modular_equipment", "source": { "col": 3, "row": 0 }, "size": [32, 32] }] },
+    { "id": "helmet_4", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "sprite": "hero-modular-parts-v3.png", "parts": [{ "sheet": "modular_equipment", "source": { "col": 4, "row": 0 }, "size": [32, 32] }] },
+
+    {
+      "id": "armor_0", "type": "armor", "slot": "body", "layer": "armor", "anchor": "bodyAnchor", "sprite": "hero-modular-parts-v3.png",
+      "parts": [
+        { "sheet": "modular_equipment", "source": { "col": 0, "row": 2 }, "size": [40, 40] },
+        { "sheet": "modular_equipment", "source": { "col": 0, "row": 1, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftHandAnchor", "size": [15, 24] },
+        { "sheet": "modular_equipment", "source": { "col": 0, "row": 1, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -90, "size": [15, 24] }
+      ]
+    },
+    {
+      "id": "armor_1", "type": "armor", "slot": "body", "layer": "armor", "anchor": "bodyAnchor", "sprite": "hero-modular-parts-v3.png",
+      "parts": [
+        { "sheet": "modular_equipment", "source": { "col": 1, "row": 2 }, "size": [40, 40] },
+        { "sheet": "modular_equipment", "source": { "col": 1, "row": 1, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftHandAnchor", "size": [15, 24] },
+        { "sheet": "modular_equipment", "source": { "col": 1, "row": 1, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -90, "size": [15, 24] }
+      ]
+    },
+    {
+      "id": "armor_2", "type": "armor", "slot": "body", "layer": "armor", "anchor": "bodyAnchor", "sprite": "hero-modular-parts-v3.png",
+      "parts": [
+        { "sheet": "modular_equipment", "source": { "col": 2, "row": 2 }, "size": [40, 40] },
+        { "sheet": "modular_equipment", "source": { "col": 2, "row": 1, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftHandAnchor", "size": [15, 24] },
+        { "sheet": "modular_equipment", "source": { "col": 2, "row": 1, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -90, "size": [15, 24] }
+      ]
+    },
+    {
+      "id": "armor_3", "type": "armor", "slot": "body", "layer": "armor", "anchor": "bodyAnchor", "sprite": "hero-modular-parts-v3.png",
+      "parts": [
+        { "sheet": "modular_equipment", "source": { "col": 3, "row": 2 }, "size": [40, 40] },
+        { "sheet": "modular_equipment", "source": { "col": 3, "row": 1, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftHandAnchor", "size": [15, 24] },
+        { "sheet": "modular_equipment", "source": { "col": 3, "row": 1, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -90, "size": [15, 24] }
+      ]
+    },
+    {
+      "id": "armor_4", "type": "armor", "slot": "body", "layer": "armor", "anchor": "bodyAnchor", "sprite": "hero-modular-parts-v3.png",
+      "parts": [
+        { "sheet": "modular_equipment", "source": { "col": 4, "row": 2 }, "size": [40, 40] },
+        { "sheet": "modular_equipment", "source": { "col": 4, "row": 1, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftHandAnchor", "size": [15, 24] },
+        { "sheet": "modular_equipment", "source": { "col": 4, "row": 1, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": -90, "size": [15, 24] }
+      ]
+    },
+
+    { "id": "boots_0", "type": "boots", "slot": "feet", "layer": "armor", "parts": [{ "sheet": "modular_equipment", "source": { "col": 0, "row": 3, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftFootAnchor", "size": [14, 21] }, { "sheet": "modular_equipment", "source": { "col": 0, "row": 3, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightFootAnchor", "size": [14, 21] }] },
+    { "id": "boots_1", "type": "boots", "slot": "feet", "layer": "armor", "parts": [{ "sheet": "modular_equipment", "source": { "col": 1, "row": 3, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftFootAnchor", "size": [14, 21] }, { "sheet": "modular_equipment", "source": { "col": 1, "row": 3, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightFootAnchor", "size": [14, 21] }] },
+    { "id": "boots_2", "type": "boots", "slot": "feet", "layer": "armor", "parts": [{ "sheet": "modular_equipment", "source": { "col": 2, "row": 3, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftFootAnchor", "size": [14, 21] }, { "sheet": "modular_equipment", "source": { "col": 2, "row": 3, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightFootAnchor", "size": [14, 21] }] },
+    { "id": "boots_3", "type": "boots", "slot": "feet", "layer": "armor", "parts": [{ "sheet": "modular_equipment", "source": { "col": 3, "row": 3, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftFootAnchor", "size": [14, 21] }, { "sheet": "modular_equipment", "source": { "col": 3, "row": 3, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightFootAnchor", "size": [14, 21] }] },
+    { "id": "boots_4", "type": "boots", "slot": "feet", "layer": "armor", "parts": [{ "sheet": "modular_equipment", "source": { "col": 4, "row": 3, "subRect": [0, 0, 0.5, 1] }, "anchor": "leftFootAnchor", "size": [14, 21] }, { "sheet": "modular_equipment", "source": { "col": 4, "row": 3, "subRect": [0.5, 0, 0.5, 1] }, "anchor": "rightFootAnchor", "size": [14, 21] }] },
+
+    { "id": "amulet_0", "type": "effect", "slot": "neck", "layer": "effect", "parts": [{ "kind": "aura", "anchor": "bodyAnchor", "size": [58, 58], "alpha": 0.28, "effect": { "color": "#9ee889", "radius": 29, "lineWidth": 2 } }] },
+    { "id": "amulet_1", "type": "effect", "slot": "neck", "layer": "effect", "parts": [{ "kind": "aura", "anchor": "bodyAnchor", "size": [58, 58], "alpha": 0.28, "effect": { "color": "#ffb55f", "radius": 29, "lineWidth": 2 } }] },
+    { "id": "amulet_2", "type": "effect", "slot": "neck", "layer": "effect", "parts": [{ "kind": "aura", "anchor": "bodyAnchor", "size": [58, 58], "alpha": 0.28, "effect": { "color": "#c1f3ff", "radius": 29, "lineWidth": 2 } }] },
+    { "id": "amulet_3", "type": "effect", "slot": "neck", "layer": "effect", "parts": [{ "kind": "aura", "anchor": "bodyAnchor", "size": [58, 58], "alpha": 0.28, "effect": { "color": "#d4b4ff", "radius": 29, "lineWidth": 2 } }] },
+    { "id": "amulet_4", "type": "effect", "slot": "neck", "layer": "effect", "parts": [{ "kind": "aura", "anchor": "bodyAnchor", "size": [58, 58], "alpha": 0.28, "effect": { "color": "#ff82dc", "radius": 29, "lineWidth": 2 } }] }
+  ]
+}

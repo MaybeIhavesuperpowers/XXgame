@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>分层装备挂载系统 · 最小示例</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#11131a;color:#eee4d0;font:14px system-ui,"Microsoft YaHei";display:grid;place-items:center;min-height:100vh}.demo{width:min(900px,96vw);padding:18px;background:#1a1d27;border:1px solid #595360}.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}.toolbar label{display:grid;gap:4px;color:#bdb6a7}.toolbar select{min-width:120px;padding:7px;background:#10121a;color:#fff;border:1px solid #5c5664}canvas{display:block;width:100%;height:auto;background:#242b35;border:2px solid #756b61;image-rendering:pixelated;image-rendering:crisp-edges}.status{margin:9px 0 0;color:#8de2a5}code{color:#ffe292}
+  </style>
+</head>
+<body>
+  <main class="demo">
+    <h1>Layer Based Equipment Rendering</h1>
+    <div class="toolbar">
+      <label>动画<select id="animation"><option>idle</option><option>walk</option><option>run</option><option>attack</option><option>hurt</option></select></label>
+      <label>方向<select id="direction"><option>down</option><option>right</option><option>up</option><option>left</option></select></label>
+      <label>武器<select id="weapon"><option value="weapon_sword">长剑</option><option value="weapon_spear">长枪</option><option value="weapon_axe">战斧</option><option value="weapon_staff">星杖</option><option value="weapon_daggers">双刃</option><option value="">卸下</option></select></label>
+      <label>护甲<select id="armor"><option value="armor_0">森林甲</option><option value="armor_1">熔火甲</option><option value="armor_2">冰霜甲</option><option value="armor_3">雷霆甲</option><option value="armor_4">虚空甲</option><option value="">卸下</option></select></label>
+      <label>头盔<select id="helmet"><option value="helmet_0">森林盔</option><option value="helmet_1">熔火盔</option><option value="helmet_2">冰霜盔</option><option value="helmet_3">雷霆盔</option><option value="helmet_4">虚空盔</option><option value="">卸下</option></select></label>
+    </div>
+    <canvas id="demo-canvas" width="640" height="360" aria-label="分层角色演示"></canvas>
+    <p id="status" class="status">正在载入 JSON 与图集……</p>
+    <p>运行方式：在项目根目录执行 <code>start.ps1</code>，再打开 <code>/demo/equipment-system.html</code>。</p>
+  </main>
+  <script src="../src/equipment/SpriteSheet.js" defer></script>
+  <script src="../src/equipment/Equipment.js" defer></script>
+  <script src="../src/equipment/Character.js" defer></script>
+  <script src="../src/equipment/LayeredCharacterRenderer.js" defer></script>
+  <script src="../src/equipment/EquipmentSystem.js" defer></script>
+  <script src="equipment-demo.js" defer></script>
+</body>
+</html>

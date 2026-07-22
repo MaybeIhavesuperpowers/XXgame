@@ -268,7 +268,7 @@
     enemies: [], particles: [], numbers: [], telegraphs: [], projectiles: [], impacts: [], resources: [], altars: [], groundDrops: [],
     screenShake: 0, hitStop: 0, lastTime: 0, autosave: 0, zoneTime: 0, hazardTimer: 2.5, unseenItems: 0,
     forgeTab: "craft", selectedForge: null, inventoryPage: 0, mapZoom: 1, runLoot: { gold: 0, materials: 0, kills: 0 },
-    audio: null
+    audio: null, equipmentSystem: null, playerVisual: null, visualEquipmentSignature: ""
   };
 
   const $ = id => document.getElementById(id);
@@ -323,6 +323,66 @@
     const row = { weapon: 0, helmet: 1, armor: 2, boots: 3, amulet: 4 }[item?.slot] ?? 0;
     const col = item?.slot === "weapon" ? WEAPON_TYPES.indexOf(weaponTypeOf(item)) : clamp(item?.region ?? 0, 0, 4);
     return { col: Math.max(0, col), row };
+  }
+
+  async function initializeEquipmentRendering() {
+    if (!window.PixelEquipment?.EquipmentSystem) throw new Error("Equipment rendering modules are unavailable");
+    const system = await window.PixelEquipment.EquipmentSystem.load({
+      rigUrl: "data/characters/player-rig.json",
+      catalogUrl: "data/equipment/equipment-catalog.json"
+    });
+    game.equipmentSystem = system;
+    game.playerVisual = system.createCharacter("local-player", { x: game.player.x, y: game.player.y, direction: "down" });
+    game.visualEquipmentSignature = "";
+    document.documentElement.dataset.equipmentRenderer = "layered-anchor-v1";
+  }
+
+  function visualEquipmentDefinitions() {
+    const equipped = game.save.equipment.equipped;
+    return [
+      equipped.weapon && [`weapon_${weaponTypeOf(equipped.weapon)}`, equipped.weapon],
+      equipped.helmet && [`helmet_${clamp(equipped.helmet.region ?? 0, 0, 4)}`, equipped.helmet],
+      equipped.armor && [`armor_${clamp(equipped.armor.region ?? 0, 0, 4)}`, equipped.armor],
+      equipped.boots && [`boots_${clamp(equipped.boots.region ?? 0, 0, 4)}`, equipped.boots],
+      equipped.amulet && [`amulet_${clamp(equipped.amulet.region ?? 0, 0, 4)}`, equipped.amulet]
+    ].filter(Boolean);
+  }
+
+  function syncVisualEquipment() {
+    const character = game.playerVisual, system = game.equipmentSystem;
+    if (!character || !system) return;
+    const definitions = visualEquipmentDefinitions();
+    const signature = definitions.map(([definitionId, item]) => `${definitionId}:${item.id}`).join("|");
+    if (signature === game.visualEquipmentSignature) return;
+    character.clearEquipment();
+    definitions.forEach(([definitionId, item]) => {
+      if (system.catalog.has(definitionId)) character.equip(system.createEquipment(definitionId, { instanceId: item.id, stats: item.main }));
+    });
+    game.visualEquipmentSignature = signature;
+  }
+
+  function syncLayeredPlayerVisual(deltaSeconds = 0) {
+    const character = game.playerVisual, p = game.player;
+    if (!character) return null;
+    const speed = Math.hypot(p.vx, p.vy), moving = speed > 12;
+    const aimAngle = p.swing ? Math.atan2(p.swing.dy, p.swing.dx) : (Number.isFinite(p.aimAngle) ? p.aimAngle : Math.atan2(p.dirY, p.dirX));
+    const ax = Math.cos(aimAngle), ay = Math.sin(aimAngle);
+    const direction = Math.abs(ax) >= Math.abs(ay) ? (ax >= 0 ? "right" : "left") : (ay >= 0 ? "down" : "up");
+    const state = p.swing ? "attack" : p.hurtFx > .11 ? "hurt" : p.running && moving ? "run" : moving ? "walk" : "idle";
+    const newSwing = Boolean(p.swing && character.pose.swingObject !== p.swing);
+    character.setPosition(p.x, p.y).setDirection(direction).setAnimation(state, { restart: newSwing });
+    if (p.swing) character.pose.swingObject = p.swing; else character.pose.swingObject = null;
+    const swingProgress = p.swing ? clamp(1 - p.swing.t / p.swing.max, 0, 1) : .5;
+    const swingDirection = p.swing?.combo === 2 ? -1 : 1;
+    const swingArc = p.swing ? swingDirection * lerp(-.68, .58, swingProgress) : 0;
+    character.pose.aimAngle = aimAngle;
+    character.pose.weaponAngle = aimAngle + swingArc;
+    character.pose.attackProgress = swingProgress;
+    character.alpha = p.invuln > 0 && Math.floor(performance.now() / 55) % 2 ? .46 : 1;
+    character.filter = p.hurtFx > 0 ? "brightness(1.6) saturate(.65)" : "none";
+    syncVisualEquipment();
+    if (deltaSeconds > 0) character.update(deltaSeconds);
+    return character;
   }
 
   function materialCoords(key) {
@@ -1142,7 +1202,7 @@
     if (game.paused || game.scene === "title" || isModalOpen()) return;
     game.zoneTime += dt; game.save.playtime += dt; game.autosave += dt;
     if (game.autosave >= 30) { game.autosave = 0; saveGame(true); }
-    updatePlayer(dt); updateEffects(dt);
+    updatePlayer(dt); syncLayeredPlayerVisual(dt); updateEffects(dt);
     if (game.scene === "expedition") {
       game.enemies.forEach(e => updateEnemy(e, dt)); updateTelegraphs(dt); updateProjectiles(dt); updateAmbientHazard(dt);
       game.enemies = game.enemies.filter(e => !e.dead || e.boss || Math.random() > dt * 2);
@@ -1212,6 +1272,33 @@
   }
 
   function drawPlayer(p, time) {
+    if (game.equipmentSystem && game.playerVisual) return drawLayeredPlayer(p, time);
+    return drawPlayerLegacy(p, time);
+  }
+
+  function drawLayeredPlayer(p, time) {
+    const character = syncLayeredPlayerVisual(0), renderer = game.equipmentSystem.renderer;
+    renderer.render(ctx, character);
+    if (p.swing) {
+      const type = equippedWeaponType(), weaponAngle = character.pose.weaponAngle;
+      const wax = Math.cos(weaponAngle), way = Math.sin(weaponAngle);
+      const hand = renderer.getWorldAnchor(character, "rightHandAnchor");
+      const effectSize = (type === "axe" ? 105 : type === "spear" ? 82 : type === "staff" ? 72 : 76) + (p.swing.combo === 3 ? 18 : 0);
+      // The weapon sprite origin is its grip, so the blade and attack effect
+      // share this exact animated right-hand socket for every aim angle.
+      const effectDistance = { sword:31, spear:43, axe:38, staff:39, daggers:25 }[type] || 31;
+      const effectX = Math.round(hand.x + wax * effectDistance), effectY = Math.round(hand.y + way * effectDistance);
+      const offset = { spear:Math.PI/4, axe:0, staff:Math.PI/4, daggers:2.5 }[type] || 0;
+      if (type === "sword") drawSwordWave(effectX, effectY, effectSize, { rotation:weaponAngle, alpha:.82 });
+      else drawEffect(WEAPON_TYPES.indexOf(type), effectX, effectY, effectSize, { rotation:weaponAngle + offset, alpha:.78 });
+    }
+    Object.keys(p.statuses || {}).forEach((status, index) => {
+      const effectIndex = { burn:11, slow:12, poison:13, stun:14, charm:9 }[status];
+      drawEffect(effectIndex, Math.round(p.x - 18 + index * 12), Math.round(p.y - 55), 25, { alpha:.82 });
+    });
+  }
+
+  function drawPlayerLegacy(p, time) {
     const type=equippedWeaponType(),speed=Math.hypot(p.vx,p.vy),moving=speed>12,locomoting=moving&&!p.swing&&p.recoveryPose<=0,angle=p.swing?Math.atan2(p.swing.dy,p.swing.dx):(Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX)),ax=Math.cos(angle),ay=Math.sin(angle),dirCol=Math.abs(ax)>=Math.abs(ay)?(ax>=0?0:2):(ay>=0?1:3),running=locomoting&&p.running,runFrame=Math.floor(time*12)%4,walkFrame=Math.floor(time*7)%2,frame=running?runFrame:walkFrame,cycle=running?12:moving?7:2.5;
     const bob=p.dash>0?0:running?[0,-2,0,2][runFrame]:moving?(walkFrame?-1.2:1.2):Math.sin(time*cycle),stride=running?[-3.2,0,3.2,0][runFrame]:(moving?(walkFrame?-1.8:1.8):0),armSwing=-stride*.72,tilt=moving?Math.sin(time*cycle)*.014:0,equipped=game.save.equipment.equipped,layerFlip=dirCol===2,backAlpha=dirCol===3?.78:1,flashFilter=p.hurtFx>0?"brightness(1.6) saturate(.65)":"none";
     const blinkAlpha=p.invuln>0&&Math.floor(time*18)%2?.46:1;ctx.save();ctx.globalAlpha=blinkAlpha;
@@ -1539,5 +1626,13 @@
 
   function resizeShell(){const shell=$("game-shell"),scale=Math.max(.1,Math.min(innerWidth/W,innerHeight/H)),scaledW=W*scale,scaledH=H*scale;shell.style.left=`${Math.max(0,(innerWidth-scaledW)/2)}px`;shell.style.top=`${Math.max(0,(innerHeight-scaledH)/2)}px`;shell.style.transform=`scale(${scale})`;}
 
-  addEventListener("resize",resizeShell);resizeShell();if(matchMedia("(pointer: coarse)").matches)$("mobile-controls").classList.remove("hidden");setupEvents(); updateHUD(); requestAnimationFrame(loop);
+  async function bootGame() {
+    try { await initializeEquipmentRendering(); }
+    catch (error) { console.error("Layered equipment renderer failed to initialize; using compatibility renderer.", error);document.documentElement.dataset.equipmentRenderer="legacy-fallback"; }
+    addEventListener("resize",resizeShell);resizeShell();
+    if(matchMedia("(pointer: coarse)").matches)$("mobile-controls").classList.remove("hidden");
+    setupEvents();updateHUD();requestAnimationFrame(loop);
+  }
+
+  bootGame();
 })();
