@@ -92,6 +92,9 @@ assert.ok(!html.includes('id="music-toggle-btn"'), "obsolete standalone music bu
 assert.ok(!html.includes('class="quickbar'), "bottom persistent key guide must stay removed");
 assert.match(css,/\.menu-dock button\s*\{[^}]*background:transparent;\s*box-shadow:none/,"HUD menu buttons must be frameless icons");
 assert.match(css,/\.menu-dock button::after\s*\{\s*content:attr\(data-tooltip\)/,"HUD icons must reveal their labels on hover");
+assert.match(css,/\.tooltip\s*\{[^}]*z-index:180;/,"equipment details must render above z-index 120 modal windows");
+assert.match(game,/itemTooltipCard\(item,"背包装备"\).*itemTooltipCard\(equipped,"当前穿戴"\)/,"inventory hover must compare backpack gear with the currently equipped item");
+assert.match(game,/x=clamp\(x,6,W-tipWidth-6\);y=clamp\(y,6,H-tipHeight-6\)/,"equipment detail panels must remain inside the game viewport");
 assert.ok(html.includes('id="hud-portrait"'),"player HUD portrait is missing");
 assert.ok(html.includes('assets/sprites/player-hud-portrait-v1.png'),"player HUD must use the dedicated front-facing portrait asset");
 assert.deepEqual(pngSize("assets/sprites/player-hud-portrait-v1.png"),[128,128],"player HUD portrait must be a normalized square image");

@@ -97,6 +97,14 @@ check("settings, automatic aim, replayable depths and weapon combos are producti
   assert.match(source,/generateItem\(game\.biome, game\.depth, 0, new RNG\([^\n]+\), 3\)/);
 });
 
+check("inventory details and equipped-item comparison render above modal windows",()=>{
+  const source=read("src/game.js"),css=read("styles.css");
+  assert.match(source,/itemTooltipCard\(item,"背包装备"\).*itemTooltipCard\(equipped,"当前穿戴"\)/);
+  assert.match(source,/bindItemTooltip\(n,item,game\.save\.equipment\.equipped\[item\.slot\]\)/);
+  assert.match(source,/x=clamp\(x,6,W-tipWidth-6\);y=clamp\(y,6,H-tipHeight-6\)/);
+  assert.match(css,/\.modal\s*\{\s*z-index:120;/);assert.match(css,/\.tooltip\s*\{[^}]*z-index:180;/);
+});
+
 check("potion cap, hidden helmet, sheathed weapon, axe spin and persistent full test save are wired",()=>{
   const html=read("index.html"),source=read("src/game.js"),rig=JSON.parse(read("data/characters/player-rig.json")),catalog=JSON.parse(read("data/equipment/equipment-catalog.json")),testSave=JSON.parse(read("data/saves/full-unlock-test-save.json"));
   assert.match(source,/const POTION_CAPACITY = 99/);assert.ok(!/potions\s*>=\s*8/.test(source));
