@@ -71,7 +71,10 @@
     waste: "assets/sprites/waste-atlas.png", tundra: "assets/sprites/tundra-atlas.png",
     peaks: "assets/sprites/peaks-atlas.png", abyss: "assets/sprites/abyss-atlas.png",
     equipment: "assets/sprites/equipment-atlas-v2.png?v=2", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas.png",
-    terrain: "assets/sprites/terrain-atlas.png",
+    terrain: "assets/sprites/terrain-atlas.png", heroBaseWalk: "assets/sprites/hero-base-walk-atlas.png?v=2",
+    heroBaseRun: "assets/sprites/hero-base-run-atlas.png?v=2", armorDirectional: "assets/sprites/armor-forest-overlay-directional-v1.png?v=2",
+    armorWalk: "assets/sprites/armor-forest-overlay-walk-v1.png?v=2", armorRun: "assets/sprites/armor-forest-overlay-run-v1.png?v=2",
+    wearableEquipment: "assets/sprites/wearable-equipment-atlas-v1.png?v=2",
     eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas.png?v=2",
     treantRoots: "assets/sprites/treant-root-vfx-v2.png?v=3", swordWave: "assets/sprites/sword-wave-v2.png?v=3"
   };
@@ -334,6 +337,7 @@
     game.paperdollVisual = system.createCharacter("paperdoll-player", { x: 90, y: 168, direction: "down" });
     game.visualEquipmentSignature = "";
     document.documentElement.dataset.equipmentRenderer = "layered-anchor-v1";
+    document.documentElement.dataset.equipmentConfig = system.configSource;
   }
 
   function visualEquipmentDefinitions() {
@@ -383,6 +387,8 @@
     character.filter = p.hurtFx > 0 ? "brightness(1.6) saturate(.65)" : "none";
     syncVisualEquipment();
     if (deltaSeconds > 0) character.update(deltaSeconds);
+    const visualState = `${character.animation}:${character.frameIndex}:${character.equipmentList().length}`;
+    if (document.documentElement.dataset.playerVisual !== visualState) document.documentElement.dataset.playerVisual = visualState;
     return character;
   }
 
@@ -1255,6 +1261,12 @@
     if(!img?.complete||!img.naturalWidth)return false;const sw=img.naturalWidth/cols,sh=img.naturalHeight/rows;
     ctx.save();ctx.translate(x,y);ctx.rotate(rotation);ctx.scale(flip?-1:1,1);ctx.globalAlpha*=alpha;ctx.filter=filter;ctx.drawImage(img,col*sw,row*sh,sw,sh,-w/2,-h/2,w,h);ctx.restore();return true;
   }
+  function drawAtlasSubCell(img,col,row,cols,rows,subRect,x,y,w,h,{flip=false,rotation=0,alpha=1,filter="none",originX=.5,originY=.5}={}){
+    if(!img?.complete||!img.naturalWidth)return false;const cellW=img.naturalWidth/cols,cellH=img.naturalHeight/rows,[sx,sy,sw,sh]=subRect;
+    const x0=Math.round((col+sx)*cellW),y0=Math.round((row+sy)*cellH),x1=Math.round((col+sx+sw)*cellW),y1=Math.round((row+sy+sh)*cellH);
+    ctx.save();ctx.translate(Math.round(x),Math.round(y));ctx.rotate(rotation);ctx.scale(flip?-1:1,1);ctx.globalAlpha*=alpha;ctx.filter=filter;ctx.imageSmoothingEnabled=false;
+    ctx.drawImage(img,x0,y0,Math.max(1,x1-x0),Math.max(1,y1-y0),Math.round(-w*originX),Math.round(-h*originY),Math.round(w),Math.round(h));ctx.restore();return true;
+  }
   function drawBiomeObject(col,x,y,size,opts={}){return drawAtlasCell(ART[BIOME_ART_KEYS[game.biome]],col,1,5,2,x,y,size,size,opts);}
   function drawEffect(index,x,y,size,opts={}){return drawAtlasCell(ART.effects,index%5,Math.floor(index/5),5,3,x,y,size,size,opts);}
   function drawMonsterEffect(col,row,x,y,size,opts={}){return drawAtlasCell(ART.monsterEffects,col,row,5,4,x,y,size,size,opts);}
@@ -1298,14 +1310,28 @@
 
   function drawPlayer(p, time) {
     if (game.equipmentSystem && game.playerVisual) return drawLayeredPlayer(p, time);
-    return drawPlayerEmergency(p);
+    return drawPlayerEmergency(p, time);
   }
 
-  function drawPlayerEmergency(p) {
+  function drawPlayerEmergency(p, time) {
     const angle = Number.isFinite(p.aimAngle) ? p.aimAngle : Math.atan2(p.dirY, p.dirX);
     const ax = Math.cos(angle), ay = Math.sin(angle);
     const col = Math.abs(ax) >= Math.abs(ay) ? (ax >= 0 ? 0 : 2) : (ay >= 0 ? 1 : 3);
-    drawAtlasCell(ART.heroBase, col, 0, 4, 5, Math.round(p.x), Math.round(p.y - 22), 82, 102, { filter:p.hurtFx > 0 ? "brightness(1.6) saturate(.65)" : "none" });
+    const speed=Math.hypot(p.vx,p.vy),moving=speed>12,running=Boolean(p.running&&moving),hurt=Boolean(p.hurtFx>.11),attack=Boolean(p.swing);
+    const walkFrame=Math.floor(time*7)%2,runFrame=Math.floor(time*12)%4,attackProgress=p.swing?clamp(1-p.swing.t/p.swing.max,0,1):0;
+    const directionalRow=attack?2+Math.min(2,Math.floor(attackProgress*3)):hurt?4:0;
+    const sheet=running?ART.heroBaseRun:moving&&!attack&&!hurt?ART.heroBaseWalk:ART.heroBase;
+    const rows=running?4:moving&&!attack&&!hurt?2:5,frameRow=running?runFrame:moving&&!attack&&!hurt?walkFrame:directionalRow;
+    const flashFilter=p.hurtFx>0?"brightness(1.6) saturate(.65)":"none";
+    drawAtlasCell(sheet,col,frameRow,4,rows,p.x,p.y-22,82,102,{filter:flashFilter});
+
+    const equipped=game.save.equipment.equipped,themeFilter=region=>["none","hue-rotate(235deg) saturate(1.45) brightness(1.05)","hue-rotate(75deg) saturate(.75) brightness(1.35)","hue-rotate(120deg) saturate(1.1) brightness(1.15)","hue-rotate(170deg) saturate(.9) brightness(.72) contrast(1.15)"][clamp(region??0,0,4)];
+    const armorSheet=running?ART.armorRun:moving&&!attack&&!hurt?ART.armorWalk:ART.armorDirectional;
+    if(equipped.armor)drawAtlasSubCell(armorSheet,col,frameRow,4,rows,[0,0,1,.72],p.x,p.y-22,82,73,{originY:.7,filter:themeFilter(equipped.armor.region)});
+    if(equipped.boots)drawAtlasSubCell(armorSheet,col,frameRow,4,rows,[0,.72,1,.28],p.x,p.y+14,82,29,{filter:themeFilter(equipped.boots.region)});
+    if(equipped.helmet)drawAtlasCell(ART.wearableEquipment,clamp(equipped.helmet.region??0,0,4),0,5,3,p.x,p.y-48,36,36,{filter:flashFilter});
+    if(equipped.amulet){ctx.save();ctx.globalAlpha=.24+.06*Math.sin(time*5);ctx.strokeStyle=BIOMES[equipped.amulet.region||0].accent;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y-22,30+Math.sin(time*4)*2,0,Math.PI*2);ctx.stroke();ctx.restore();}
+    if(equipped.weapon){const type=weaponTypeOf(equipped.weapon),weaponCol=Math.max(0,WEAPON_TYPES.indexOf(type)),swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,attackProgress):0,weaponAngle=angle+swingArc,handX=p.x+Math.cos(weaponAngle)*24,handY=p.y-23+Math.sin(weaponAngle)*24;drawAtlasCell(ART.wearableEquipment,weaponCol,2,5,3,handX,handY,type==="spear"?60:56,type==="spear"?60:56,{rotation:weaponAngle-Math.PI/4,filter:flashFilter});}
   }
 
   function drawLayeredPlayer(p, time) {

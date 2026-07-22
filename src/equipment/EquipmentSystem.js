@@ -4,11 +4,12 @@
   const ns = window.PixelEquipment = window.PixelEquipment || {};
 
   class EquipmentSystem {
-    constructor({ rig, catalog, registry, renderer }) {
+    constructor({ rig, catalog, registry, renderer, configSource = "json" }) {
       this.rig = rig;
       this.catalog = catalog;
       this.registry = registry;
       this.renderer = renderer;
+      this.configSource = configSource;
     }
 
     static async fetchJson(url) {
@@ -56,12 +57,28 @@
       if (errors.length) throw new Error(`Invalid equipment configuration:\n${errors.join("\n")}`);
     }
 
-    static async load({ rigUrl, catalogUrl }) {
+    static async load({ rigUrl, catalogUrl, embeddedConfig = ns.EMBEDDED_CONFIG }) {
       const absoluteRigUrl = new URL(rigUrl, document.baseURI);
       const absoluteCatalogUrl = new URL(catalogUrl, document.baseURI);
-      const [rig, catalogConfig] = await Promise.all([
-        EquipmentSystem.fetchJson(absoluteRigUrl), EquipmentSystem.fetchJson(absoluteCatalogUrl)
-      ]);
+      let rig, catalogConfig, configSource = "json";
+      const fileMode = document.location?.protocol === "file:";
+      if (fileMode && embeddedConfig?.rig && embeddedConfig?.catalog) {
+        rig = embeddedConfig.rig;
+        catalogConfig = embeddedConfig.catalog;
+        configSource = "embedded-file";
+      } else {
+        try {
+          [rig, catalogConfig] = await Promise.all([
+            EquipmentSystem.fetchJson(absoluteRigUrl), EquipmentSystem.fetchJson(absoluteCatalogUrl)
+          ]);
+        } catch (error) {
+          if (!embeddedConfig?.rig || !embeddedConfig?.catalog) throw error;
+          console.warn("Equipment JSON could not be loaded; using the embedded production snapshot.", error);
+          rig = embeddedConfig.rig;
+          catalogConfig = embeddedConfig.catalog;
+          configSource = "embedded-fallback";
+        }
+      }
       const resolveSheets = (configs, baseUrl) => configs.map(config => ({ ...config, src: new URL(config.src, baseUrl).href }));
       const standaloneSheets = (catalogConfig.items || []).filter(item => !item.parts?.length && item.sprite).map(item => ({
         id: item.sheet || `equipment:${item.id}`, src: new URL(item.sprite, absoluteCatalogUrl).href,
@@ -76,7 +93,7 @@
       await registry.loadAll();
       const catalog = new ns.EquipmentCatalog(catalogConfig);
       const renderer = new ns.LayeredCharacterRenderer({ registry, layerOrder: rig.layerOrder });
-      return new EquipmentSystem({ rig, catalog, registry, renderer });
+      return new EquipmentSystem({ rig, catalog, registry, renderer, configSource });
     }
 
     createCharacter(id, options = {}) {

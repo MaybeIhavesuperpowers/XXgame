@@ -20,6 +20,9 @@ require(path.join(root, "src/equipment/LayeredCharacterRenderer.js"));
 
 const rig = readJson("data/characters/player-rig.json");
 const catalogConfig = readJson("data/equipment/equipment-catalog.json");
+require(path.join(root, "data/equipment/embedded-config.js"));
+assert.deepEqual(PixelEquipment.EMBEDDED_CONFIG.rig, rig, "embedded rig snapshot must match JSON");
+assert.deepEqual(PixelEquipment.EMBEDDED_CONFIG.catalog, catalogConfig, "embedded catalog snapshot must match JSON");
 const catalog = new PixelEquipment.EquipmentCatalog(catalogConfig);
 const registry = new PixelEquipment.SpriteSheetRegistry([
   ...rig.spriteSheets,
@@ -46,6 +49,12 @@ for (let theme = 0; theme < 5; theme += 1) {
 }
 
 const character = new PixelEquipment.Character({ id: "test", rig, direction: "down" });
+character.setAnimation("walk", { restart: true }).update(0.16);
+assert.equal(character.frameIndex, 1, "walk animation must advance to its second frame");
+character.setAnimation("run", { restart: true }).update(0.09);
+assert.equal(character.frameIndex, 1, "run animation must advance through four frames");
+character.setAnimation("attack", { restart: true }).update(0.09);
+assert.equal(character.frameIndex, 1, "attack animation must advance while the swing is active");
 const armor = catalog.create("armor_0");
 character.equip(armor);
 const expectedSheets = {
@@ -94,5 +103,8 @@ for (const legacyName of [
   "hero-equipment-layers-v2.png", "hero-modular-parts-v3.png",
   "hero-run-atlas-v2.png", "hero-walk-atlas-v3.png"
 ]) assert.ok(!activeSource.includes(legacyName), `legacy asset reference remains: ${legacyName}`);
+
+const indexHtml = fs.readFileSync(path.join(root, "index.html"), "utf8");
+assert.ok(indexHtml.indexOf("embedded-config.js") < indexHtml.indexOf("EquipmentSystem.js"), "embedded config must load before EquipmentSystem");
 
 console.log("equipment-system tests passed");
