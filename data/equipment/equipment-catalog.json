@@ -5,7 +5,8 @@
     { "id": "armor_forest_directional", "src": "../../assets/sprites/armor-forest-overlay-directional-v1.png?v=2", "columns": 4, "rows": 5 },
     { "id": "armor_forest_walk", "src": "../../assets/sprites/armor-forest-overlay-walk-v1.png?v=2", "columns": 4, "rows": 2 },
     { "id": "armor_forest_run", "src": "../../assets/sprites/armor-forest-overlay-run-v1.png?v=2", "columns": 4, "rows": 4 },
-    { "id": "wearable_equipment", "src": "../../assets/sprites/wearable-equipment-atlas-v1.png?v=2", "columns": 5, "rows": 3 }
+    { "id": "wearable_equipment", "src": "../../assets/sprites/wearable-equipment-atlas-v1.png?v=2", "columns": 5, "rows": 3 },
+    { "id": "helmet_directional", "src": "../../assets/sprites/helmet-directional-atlas-v3.png?v=1", "columns": 5, "rows": 4 }
   ],
   "animationSets": {
     "forest_vanguard": {
@@ -43,36 +44,41 @@
   },
   "items": [
     {
-      "id": "weapon_sword", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "id": "weapon_sword", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45, "carryOnBack": true,
+      "backPose": { "anchor": "backAnchor", "layer": "body", "zOffset": -5, "rotationMode": "anchor", "rotation": 0, "offset": { "x": -2, "y": 10 } },
       "zByDirection": { "up": -50 }, "tags": ["melee", "sword"],
-      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 0, "row": 2 }, "size": [54, 54], "origin": { "x": 0.18, "y": 0.83 } }]
+      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 0, "row": 2 }, "size": [54, 54], "origin": { "x": 0.33, "y": 0.58 } }]
     },
     {
-      "id": "weapon_spear", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "id": "weapon_spear", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45, "carryOnBack": true,
+      "backPose": { "anchor": "backAnchor", "layer": "body", "zOffset": -5, "rotationMode": "anchor", "rotation": 0, "offset": { "x": -4, "y": 12 } },
       "zByDirection": { "up": -50 }, "tags": ["melee", "spear"],
-      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 1, "row": 2 }, "size": [60, 60], "origin": { "x": 0.16, "y": 0.87 } }]
+      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 1, "row": 2 }, "size": [60, 60], "origin": { "x": 0.31, "y": 0.63 } }]
     },
     {
-      "id": "weapon_axe", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "id": "weapon_axe", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45, "carryOnBack": true,
+      "backPose": { "anchor": "backAnchor", "layer": "body", "zOffset": -5, "rotationMode": "anchor", "rotation": 0, "offset": { "x": -3, "y": 11 } },
       "zByDirection": { "up": -50 }, "tags": ["melee", "axe"],
-      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 2, "row": 2 }, "size": [56, 56], "origin": { "x": 0.2, "y": 0.83 } }]
+      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 2, "row": 2 }, "size": [56, 56], "origin": { "x": 0.27, "y": 0.59 } }]
     },
     {
-      "id": "weapon_staff", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "id": "weapon_staff", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45, "carryOnBack": true,
+      "backPose": { "anchor": "backAnchor", "layer": "body", "zOffset": -5, "rotationMode": "anchor", "rotation": 0, "offset": { "x": -5, "y": 12 } },
       "zByDirection": { "up": -50 }, "tags": ["ranged", "staff"],
-      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 3, "row": 2 }, "size": [58, 58], "origin": { "x": 0.18, "y": 0.87 } }]
+      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 3, "row": 2 }, "size": [58, 58], "origin": { "x": 0.16, "y": 0.60 } }]
     },
     {
-      "id": "weapon_daggers", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45,
+      "id": "weapon_daggers", "type": "weapon", "slot": "rightHand", "layer": "weapon", "anchor": "rightHandAnchor", "rotationMode": "weapon", "rotation": 45, "carryOnBack": true,
+      "backPose": { "anchor": "backAnchor", "layer": "body", "zOffset": -5, "rotationMode": "anchor", "rotation": 0, "offset": { "x": -1, "y": 9 } },
       "zByDirection": { "up": -50 }, "tags": ["melee", "daggers"],
-      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 4, "row": 2 }, "size": [48, 48], "origin": { "x": 0.5, "y": 0.72 } }]
+      "parts": [{ "sheet": "wearable_equipment", "source": { "col": 4, "row": 2 }, "size": [48, 48], "origin": { "x": 0.34, "y": 0.54 } }]
     },
 
-    { "id": "helmet_0", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "wearable_equipment", "source": { "col": 0, "row": 0 }, "size": [36, 36], "origin": { "x": 0.5, "y": 0.54 } }] },
-    { "id": "helmet_1", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "wearable_equipment", "source": { "col": 1, "row": 0 }, "size": [36, 36], "origin": { "x": 0.5, "y": 0.54 } }] },
-    { "id": "helmet_2", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "wearable_equipment", "source": { "col": 2, "row": 0 }, "size": [36, 36], "origin": { "x": 0.5, "y": 0.54 } }] },
-    { "id": "helmet_3", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "wearable_equipment", "source": { "col": 3, "row": 0 }, "size": [36, 36], "origin": { "x": 0.5, "y": 0.54 } }] },
-    { "id": "helmet_4", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "wearable_equipment", "source": { "col": 4, "row": 0 }, "size": [36, 36], "origin": { "x": 0.5, "y": 0.54 } }] },
+    { "id": "helmet_0", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "helmet_directional", "source": { "col": 0, "row": 1 }, "size": [48, 48], "directions": { "right": { "source": { "row": 0 } }, "down": { "source": { "row": 1 } }, "left": { "source": { "row": 2 } }, "up": { "source": { "row": 3 } } } }] },
+    { "id": "helmet_1", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "helmet_directional", "source": { "col": 1, "row": 1 }, "size": [48, 48], "directions": { "right": { "source": { "row": 0 } }, "down": { "source": { "row": 1 } }, "left": { "source": { "row": 2 } }, "up": { "source": { "row": 3 } } } }] },
+    { "id": "helmet_2", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "helmet_directional", "source": { "col": 2, "row": 1 }, "size": [48, 48], "directions": { "right": { "source": { "row": 0 } }, "down": { "source": { "row": 1 } }, "left": { "source": { "row": 2 } }, "up": { "source": { "row": 3 } } } }] },
+    { "id": "helmet_3", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "helmet_directional", "source": { "col": 3, "row": 1 }, "size": [48, 48], "directions": { "right": { "source": { "row": 0 } }, "down": { "source": { "row": 1 } }, "left": { "source": { "row": 2 } }, "up": { "source": { "row": 3 } } } }] },
+    { "id": "helmet_4", "type": "helmet", "slot": "head", "layer": "helmet", "anchor": "headAnchor", "parts": [{ "sheet": "helmet_directional", "source": { "col": 4, "row": 1 }, "size": [48, 48], "directions": { "right": { "source": { "row": 0 } }, "down": { "source": { "row": 1 } }, "left": { "source": { "row": 2 } }, "up": { "source": { "row": 3 } } } }] },
 
     { "id": "armor_0", "type": "armor", "slot": "body", "layer": "armor", "anchor": "bodyAnchor", "animationSet": "forest_vanguard", "parts": [{ "sheet": "armor_forest_directional", "source": { "col": 0, "row": 0, "subRect": [0, 0, 1, 0.72] }, "animationSet": "forest_vanguard", "size": [82, 73], "origin": { "x": 0.5, "y": 0.7 } }] },
     { "id": "armor_1", "type": "armor", "slot": "body", "layer": "armor", "anchor": "bodyAnchor", "animationSet": "forest_vanguard", "filter": "hue-rotate(235deg) saturate(1.45) brightness(1.05)", "parts": [{ "sheet": "armor_forest_directional", "source": { "col": 0, "row": 0, "subRect": [0, 0, 1, 0.72] }, "animationSet": "forest_vanguard", "size": [82, 73], "origin": { "x": 0.5, "y": 0.7 } }] },

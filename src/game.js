@@ -17,9 +17,14 @@
   const SAVE_KEY = "pixel-era-five-realms-v1";
   const BACKUP_SAVE_KEY = `${SAVE_KEY}-backup`;
   const SLOT_SAVE_KEYS = [1,2,3].map(i => `${SAVE_KEY}-slot-${i}`);
+  const MUSIC_PREF_KEY = `${SAVE_KEY}-music-enabled`;
+  const MUSIC_VOLUME_PREF_KEY = `${SAVE_KEY}-music-volume`;
+  const SOUND_PREF_KEY = `${SAVE_KEY}-sound-enabled`;
   const SAVE_FORMAT = 4;
   const INVENTORY_CAPACITY = 120;
   const INVENTORY_PAGE_SIZE = 30;
+  const POTION_CAPACITY = 99;
+  const SHOW_WORN_HELMETS = false;
   const SLOT_NAMES = { weapon: "武器", helmet: "头盔", armor: "铠甲", boots: "靴子", amulet: "饰品" };
   const WEAPON_TYPES = ["sword", "spear", "axe", "staff", "daggers"];
   const WEAPON_NAMES = { sword: "长剑", spear: "长枪", axe: "战斧", staff: "星杖", daggers: "双刃" };
@@ -48,6 +53,16 @@
     ["远雷将至","断崖风歌","云海电鸣","天穹裂阵","雷神领域"],
     ["暮色边界","虚空脉搏","魅影回廊","混沌凝视","终焉魔域"]
   ];
+  const BGM_TRACKS = {
+    title:{src:"assets/audio/bgm/title-am-town.mp3",title:"Title Theme"},
+    camp:{src:"assets/audio/bgm/camp-town-theme.mp3",title:"Town Theme RPG"},
+    forest:{src:"assets/audio/bgm/forest-iremos.ogg",title:"Iremos Forest"},
+    waste:{src:"assets/audio/bgm/waste-lava-dungeon.mp3",title:"Lava Dungeon Battle"},
+    tundra:{src:"assets/audio/bgm/tundra-snow-globe.ogg",title:"Snow Globe"},
+    peaks:{src:"assets/audio/bgm/peaks-thunderous-fall.mp3",title:"Thunderous Fall"},
+    abyss:{src:"assets/audio/bgm/abyss-infinite-darkness.mp3",title:"Infinite Darkness"},
+    boss:{src:"assets/audio/bgm/boss-jrpg-loop.mp3",title:"Epic Rock Battle"}
+  };
   const DEPTH_MUSIC_VARIANTS = [
     { tempo:-4, transpose:0, rotate:0, pulse:[1,0,0,0,1,0,0,0] },
     { tempo:2, transpose:2, rotate:2, pulse:[1,0,1,0,1,0,0,1] },
@@ -57,6 +72,7 @@
   ];
 
   function stageMusicKey(biome,depth){return `${STAGE_MUSIC_KEYS[clamp(biome,0,4)]}-${clamp(depth,1,5)}`;}
+  function resolveBgmTrack(name){if(BGM_TRACKS[name])return BGM_TRACKS[name];const match=/^(forest|waste|tundra|peaks|abyss)-(\d)$/.exec(name||"");if(!match)return BGM_TRACKS.title;return Number(match[2])===5?BGM_TRACKS.boss:BGM_TRACKS[match[1]];}
   function resolveMusicTheme(name){
     if(MUSIC_THEMES[name])return {...MUSIC_THEMES[name],key:name,biomeKey:name,depth:0,trackName:name==="title"?"五域远征":name==="camp"?"星火余烬":name};
     const match=/^(forest|waste|tundra|peaks|abyss)-(\d)$/.exec(name||"");if(!match)return resolveMusicTheme("title");
@@ -71,13 +87,13 @@
     heroBase: "assets/sprites/hero-base-layered-atlas.png?v=2", forest: "assets/sprites/forest-atlas.png",
     waste: "assets/sprites/waste-atlas.png", tundra: "assets/sprites/tundra-atlas.png",
     peaks: "assets/sprites/peaks-atlas.png", abyss: "assets/sprites/abyss-atlas.png",
-    equipment: "assets/sprites/equipment-atlas-v2.png?v=2", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas.png",
+    equipment: "assets/sprites/equipment-atlas-v2.png?v=2", materials: "assets/sprites/materials-atlas.png", effects: "assets/sprites/effects-atlas-transparent-v2.png?v=2",
     terrain: "assets/sprites/terrain-atlas.png", heroBaseWalk: "assets/sprites/hero-base-walk-atlas.png?v=2",
     heroBaseRun: "assets/sprites/hero-base-run-atlas.png?v=2", armorDirectional: "assets/sprites/armor-forest-overlay-directional-v1.png?v=2",
     armorWalk: "assets/sprites/armor-forest-overlay-walk-v1.png?v=2", armorRun: "assets/sprites/armor-forest-overlay-run-v1.png?v=2",
-    wearableEquipment: "assets/sprites/wearable-equipment-atlas-v1.png?v=2",
-    eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas.png?v=2",
-    treantRoots: "assets/sprites/treant-root-vfx-v2.png?v=3", swordWave: "assets/sprites/sword-wave-v2.png?v=3"
+    wearableEquipment: "assets/sprites/wearable-equipment-atlas-v1.png?v=2", helmetDirectional: "assets/sprites/helmet-directional-atlas-v3.png?v=1",
+    eliteLoot: "assets/sprites/elite-loot-atlas.png?v=2", monsterEffects: "assets/sprites/monster-effects-atlas-v2.png?v=3",
+    treantRoots: "assets/sprites/treant-root-vfx-transparent-v2.png?v=4", swordWave: "assets/sprites/sword-wave-v2.png?v=3"
   };
   const ART = {};
   Object.keys(SPRITE_PATHS).forEach(key => { const img = new Image(); img.decoding = "async"; ART[key] = img; });
@@ -279,16 +295,17 @@
     materials: Object.fromEntries(Object.keys(MATERIAL_NAMES).map(k => [k, 0])),
     currencies: { gold: 120, void: 0 },
     progress: { unlocked: [0], completedDepths: [0, 0, 0, 0, 0], bossKills: [0, 0, 0, 0, 0] },
-    settings: { sound: true }
+    tutorial: { interactions: {} },
+    settings: { sound: readSoundPreference(), music: readMusicPreference(), bgmVolume: readBgmVolumePreference() }
   });
 
   const game = {
     save: freshSave(), scene: "title", paused: true, world: null, biome: 0, depth: 1,
-    keys: new Set(), mouse: { x: W / 2, y: H / 2 }, camera: { x: 0, y: 0 },
-    player: { x: 0, y: 0, vx: 0, vy: 0, dirX: 1, dirY: 0, aimAngle: 0, radius: 12, invuln: 0, dash: 0, attackCd: 0, combo: 0, comboUntil: 0, swing: null, running: false, runKey: null, runUntil: 0, lastTap: {}, recoveryPose: 0, activeCd1: 0, activeCd2: 0 },
+    keys: new Set(), camera: { x: 0, y: 0 },
+    player: { x: 0, y: 0, vx: 0, vy: 0, dirX: 1, dirY: 0, aimAngle: 0, aimTarget: null, aimLockUntil: 0, radius: 12, invuln: 0, dash: 0, attackCd: 0, combo: 0, comboUntil: 0, swing: null, weaponDrawn: 0, running: false, runKey: null, runUntil: 0, lastTap: {}, recoveryPose: 0, activeCd1: 0, activeCd2: 0 },
     enemies: [], particles: [], numbers: [], telegraphs: [], projectiles: [], impacts: [], resources: [], altars: [], groundDrops: [],
     screenShake: 0, hitStop: 0, lastTime: 0, autosave: 0, zoneTime: 0, hazardTimer: 2.5, unseenItems: 0,
-    forgeTab: "craft", selectedForge: null, inventoryPage: 0, mapZoom: 1, runLoot: { gold: 0, materials: 0, kills: 0 },
+    forgeTab: "craft", selectedForge: 0, forgeCatalysts: { rare: false, core: false }, inventoryPage: 0, inventoryTab: "equipment", mapZoom: 1, runLoot: { gold: 0, materials: 0, kills: 0 },
     audio: null, equipmentSystem: null, playerVisual: null, paperdollVisual: null, visualEquipmentSignature: ""
   };
 
@@ -298,6 +315,11 @@
   const lerp = (a, b, t) => a + (b - a) * t;
   const fmt = n => Math.round(n).toLocaleString("zh-CN");
   const qualityById = id => QUALITIES.find(q => q.id === id) || QUALITIES[0];
+
+  function readMusicPreference(){try{return localStorage.getItem(MUSIC_PREF_KEY)!=="off";}catch{return true;}}
+  function readSoundPreference(){try{return localStorage.getItem(SOUND_PREF_KEY)!=="off";}catch{return true;}}
+  function readBgmVolumePreference(){try{const raw=localStorage.getItem(MUSIC_VOLUME_PREF_KEY);if(raw===null)return .72;const value=Number(raw);return Number.isFinite(value)&&value>=0&&value<=1?value:.72;}catch{return .72;}}
+  function stripQualityPrefix(name){return String(name||"").replace(/^(?:(?:粗糙|普通|稀有|史诗|传说)[·・•\s-]+)+/,"");}
   const branchPoints = id => Object.values(game.save.skills[id]).reduce((a, b) => a + b, 0);
   const isModalOpen = () => [...document.querySelectorAll(".modal")].some(x => !x.classList.contains("hidden"));
 
@@ -349,8 +371,8 @@
   async function initializeEquipmentRendering() {
     if (!window.PixelEquipment?.EquipmentSystem) throw new Error("Equipment rendering modules are unavailable");
     const system = await window.PixelEquipment.EquipmentSystem.load({
-      rigUrl: "data/characters/player-rig.json",
-      catalogUrl: "data/equipment/equipment-catalog.json"
+      rigUrl: "data/characters/player-rig.json?v=5",
+      catalogUrl: "data/equipment/equipment-catalog.json?v=5"
     });
     game.equipmentSystem = system;
     game.playerVisual = system.createCharacter("local-player", { x: game.player.x, y: game.player.y, direction: "down" });
@@ -364,7 +386,7 @@
     const equipped = game.save.equipment.equipped;
     return [
       equipped.weapon && [`weapon_${weaponTypeOf(equipped.weapon)}`, equipped.weapon],
-      equipped.helmet && [`helmet_${clamp(equipped.helmet.region ?? 0, 0, 4)}`, equipped.helmet],
+      SHOW_WORN_HELMETS && equipped.helmet && [`helmet_${clamp(equipped.helmet.region ?? 0, 0, 4)}`, equipped.helmet],
       equipped.armor && [`armor_${clamp(equipped.armor.region ?? 0, 0, 4)}`, equipped.armor],
       equipped.boots && [`boots_${clamp(equipped.boots.region ?? 0, 0, 4)}`, equipped.boots],
       equipped.amulet && [`amulet_${clamp(equipped.amulet.region ?? 0, 0, 4)}`, equipped.amulet]
@@ -386,6 +408,9 @@
     game.visualEquipmentSignature = signature;
   }
 
+  function axeSpinAngle(progress){const eased=progress<.12?progress/.12*.08:.08+(progress-.12)/.88*.92;return eased*Math.PI*2;}
+  function weaponSwingArc(type,combo,progress){if(type==="axe"&&combo===3)return-.72;if(type==="spear"){if(combo===1)return lerp(-.12,.14,progress);if(combo===2)return lerp(.7,-.82,progress);if(combo===3)return 0;}if(type==="daggers"&&combo===3){const phase=Math.min(2,Math.floor(progress*3));return[-.38,.42,-.18][phase]+Math.sin(progress*Math.PI*6)*.16;}const direction=combo===2?-1:1;return direction*lerp(-.68,.58,progress);}
+
   function syncLayeredPlayerVisual(deltaSeconds = 0) {
     const character = game.playerVisual, p = game.player;
     if (!character) return null;
@@ -393,19 +418,24 @@
     const aimAngle = p.swing ? Math.atan2(p.swing.dy, p.swing.dx) : (Number.isFinite(p.aimAngle) ? p.aimAngle : Math.atan2(p.dirY, p.dirX));
     const ax = Math.cos(aimAngle), ay = Math.sin(aimAngle);
     const direction = Math.abs(ax) >= Math.abs(ay) ? (ax >= 0 ? "right" : "left") : (ay >= 0 ? "down" : "up");
-    const state = p.swing ? "attack" : p.hurtFx > .11 ? "hurt" : p.running && moving ? "run" : moving ? "walk" : "idle";
+    const state = p.swing || p.weaponDrawn > 0 ? "attack" : p.hurtFx > .11 ? "hurt" : p.running && moving ? "run" : moving ? "walk" : "idle";
     const newSwing = Boolean(p.swing && character.pose.swingObject !== p.swing);
     character.setPosition(p.x, p.y).setDirection(direction).setAnimation(state, { restart: newSwing });
     if (p.swing) character.pose.swingObject = p.swing; else character.pose.swingObject = null;
     const swingProgress = p.swing ? clamp(1 - p.swing.t / p.swing.max, 0, 1) : .5;
-    const swingDirection = p.swing?.combo === 2 ? -1 : 1;
-    const swingArc = p.swing ? swingDirection * lerp(-.68, .58, swingProgress) : 0;
+    const swingArc = p.swing ? weaponSwingArc(p.swing.weaponType,p.swing.combo,swingProgress) : 0;
     character.pose.aimAngle = aimAngle;
     character.pose.weaponAngle = aimAngle + swingArc;
     character.pose.attackProgress = swingProgress;
+    character.pose.worldRotation = p.swing?.weaponType === "axe" && p.swing.combo === 3 ? axeSpinAngle(swingProgress) : 0;
+    character.pose.rotationPivotY = -22;
+    document.documentElement.dataset.playerWorldRotation=character.pose.worldRotation.toFixed(3);
     character.alpha = p.invuln > 0 && Math.floor(performance.now() / 55) % 2 ? .46 : 1;
     character.filter = p.hurtFx > 0 ? "brightness(1.6) saturate(.65)" : "none";
     syncVisualEquipment();
+    const visualWeapon = character.equipment.get("rightHand");
+    const resolvedWeapon = visualWeapon?.resolveParts(character.animation, character.direction)?.[0];
+    document.documentElement.dataset.weaponMount = resolvedWeapon?.anchor || visualWeapon?.definition.anchor || "none";
     if (deltaSeconds > 0) character.update(deltaSeconds);
     if (p.swing && character.animation === "attack") {
       const frames=character.framesFor(character.getAnimation(),character.direction),mapped=Math.min(frames.length-1,Math.floor(swingProgress*frames.length));
@@ -470,13 +500,17 @@
     merged.currencies = { ...base.currencies, ...(raw.currencies || {}) };
     merged.materials = { ...base.materials, ...(raw.materials || {}) };
     merged.progress = { ...base.progress, ...(raw.progress || {}) };
+    merged.tutorial = { ...base.tutorial, ...(raw.tutorial || {}), interactions: { ...base.tutorial.interactions, ...((raw.tutorial || {}).interactions || {}) } };
+    merged.settings = { ...base.settings, ...(raw.settings || {}) };
     merged.equipment = { ...base.equipment, ...(raw.equipment || {}) };
     merged.equipment.equipped = { ...base.equipment.equipped, ...((raw.equipment || {}).equipped || {}) };
     [...Object.values(merged.equipment.equipped), ...(merged.equipment.inventory || [])].filter(Boolean).forEach(item => {
       item.region = clamp(item.region ?? 0, 0, 4);
+      item.name = stripQualityPrefix(item.name);
       item.affixes ||= [];
       if (item.slot === "weapon") item.weaponType = weaponTypeOf(item);
     });
+    merged.settings.bgmVolume=clamp(Number(merged.settings.bgmVolume ?? .72),0,1);
     merged.skills = base.skills;
     for (const branch of Object.keys(base.skills)) merged.skills[branch] = { ...base.skills[branch], ...((raw.skills || {})[branch] || {}) };
     return merged;
@@ -495,9 +529,77 @@
     };
   }
 
-  function encodeSave() {
-    const data = { version:SAVE_FORMAT, savedAt:Date.now(), save:game.save, session:snapshotSession() };
+  function encodeSaveData(save, session, savedAt = Date.now()) {
+    const data = { version:SAVE_FORMAT, savedAt, save, session };
     return JSON.stringify({ ...data, hash:hashString(JSON.stringify(data)) });
+  }
+
+  function encodeSave() { return encodeSaveData(game.save, snapshotSession()); }
+
+  function createFullUnlockTestSave() {
+    const save = freshSave();
+    save.player = { level:50, xp:0, hp:9999, stamina:100, skillPoints:99, potions:POTION_CAPACITY };
+    save.skills = {
+      fury:{blade:3,weakness:3,finisher:1},
+      survival:{toughness:3,agility:3,renewal:1},
+      explore:{haste:3,miner:3,alchemy:1}
+    };
+    save.progress = { unlocked:[0,1,2,3,4], completedDepths:[5,5,5,5,5], bossKills:[9,9,9,9,9] };
+    Object.keys(save.materials).forEach(key => { save.materials[key] = 999; });
+    save.currencies = { gold:999999, void:9999 };
+    save.tutorial.interactions = { forge:true, "equipment-drop":true, "potion-drop":true, "material-drop":true, altar:true, resource:true, portal:true };
+    const weapons = WEAPON_TYPES.map((type,index) => {
+      const legendary = LEGENDARIES[index % LEGENDARIES.length];
+      return {
+        id:`test-legendary-${type}`, name:`星火试炼${WEAPON_NAMES[type]}`, slot:"weapon", quality:"gold",
+        level:50, enhance:15, weaponType:type, region:index,
+        main:{type:"attack",value:108+index*14},
+        affixes:[
+          {type:"critRate",name:"暴击率",value:.09,suffix:"%",special:false},
+          {type:"attackSpeed",name:"攻击速度",value:.14,suffix:"%",special:false},
+          {type:"elementalDamage",name:"元素增伤",value:.22,suffix:"%",special:true},
+          {type:"eliteDamage",name:"精英增伤",value:.25,suffix:"%",special:true}
+        ],
+        legendary:{id:legendary[0],name:legendary[1],text:legendary[2]},
+        lore:"全解锁验收档专用传说武器。"
+      };
+    });
+    const gear = (slot,name,mainType,value,region,legendaryIndex) => {
+      const legendary=LEGENDARIES[legendaryIndex%LEGENDARIES.length];
+      return {id:`test-legendary-${slot}`,name,slot,quality:"gold",level:50,enhance:15,region,main:{type:mainType,value},affixes:[{type:"maxHp",name:"最大生命",value:90,suffix:"",special:false},{type:"reduction",name:"伤害减免",value:.08,suffix:"%",special:false},{type:"rareFind",name:"稀有寻获",value:.2,suffix:"%",special:true}],legendary:{id:legendary[0],name:legendary[1],text:legendary[2]},lore:"全解锁验收档专用装备。"};
+    };
+    save.equipment.equipped = {
+      weapon:weapons[0],
+      helmet:gear("helmet","星火试炼面甲","defense",58,4,0),
+      armor:gear("armor","星火试炼战铠","defense",94,4,1),
+      boots:gear("boots","星火试炼战靴","defense",52,4,2),
+      amulet:gear("amulet","星火试炼星坠","maxHp",260,4,3)
+    };
+    save.equipment.inventory = weapons.slice(1);
+    return normalizeSave(save);
+  }
+
+  function installFullUnlockTestSave() {
+    const raw = encodeSaveData(createFullUnlockTestSave(), {scene:"camp"});
+    try {
+      localStorage.setItem(SLOT_SAVE_KEYS[2], raw);
+      const loaded = decodeSave(raw, "full-unlock-test");
+      loadDecodedGame(loaded);
+      document.documentElement.dataset.qaLast = "full-save-loaded";
+      game.qaUpdateStatus?.();
+      toast("全解锁测试档已载入，并写入手动存档 3", "#a5f0ce");
+    } catch {
+      toast("无法创建测试档：浏览器本地存储不可用", "#ef7268");
+    }
+  }
+
+  function ensureFullUnlockTestSlot() {
+    try {
+      if (localStorage.getItem(SLOT_SAVE_KEYS[2])) return false;
+      localStorage.setItem(SLOT_SAVE_KEYS[2], encodeSaveData(createFullUnlockTestSave(), {scene:"camp"}));
+      document.documentElement.dataset.testSaveSlot="3";
+      return true;
+    } catch { return false; }
   }
 
   function decodeSave(raw, source = "main") {
@@ -525,7 +627,6 @@
     try {
       const current=localStorage.getItem(SAVE_KEY);if(current){try{decodeSave(current);localStorage.setItem(BACKUP_SAVE_KEY,current);}catch{/* never replace a good backup with corrupt data */}}
       localStorage.setItem(SAVE_KEY,encodeSave());
-      const state=$("save-state");if(state){state.textContent="已保存";state.classList.add("saved");setTimeout(()=>state.classList.remove("saved"),900);}
       if (!silent) { toast("星火已保存当前位置（F5 / Ctrl+S）"); playSfx("save"); }
       updateTitleSaveMeta();
       return true;
@@ -554,15 +655,19 @@
   const midiFreq = note => 440 * Math.pow(2,(note-69)/12);
 
   function ensureAudio() {
-    if (!game.save.settings.sound) return null;
+    if (!game.save.settings.sound && !game.save.settings.music) return null;
     try {
       if (!game.audio?.ctx) {
         const ctx = new (window.AudioContext || window.webkitAudioContext)(), master=ctx.createGain(),music=ctx.createGain(),sfx=ctx.createGain();
-        master.gain.value=.72;music.gain.value=.58;sfx.gain.value=.78;music.connect(master);sfx.connect(master);master.connect(ctx.destination);
-        game.audio={ctx,master,music,sfx,musicTimer:null,theme:null,step:0};
+        master.gain.value=.82;music.gain.value=.62;sfx.gain.value=.82;music.connect(master);sfx.connect(master);master.connect(ctx.destination);
+        const bgm=new Audio();bgm.loop=true;bgm.preload="auto";bgm.volume=game.save.settings.bgmVolume;
+        game.audio={ctx,master,music,sfx,bgm,musicTimer:null,theme:null,step:0};
       }
+      game.audio.sfx.gain.value=game.save.settings.sound?.82:0;
+      game.audio.music.gain.value=game.save.settings.music?.62*game.save.settings.bgmVolume:0;
+      game.audio.bgm.volume=game.save.settings.bgmVolume;
       if(game.audio.ctx.state==="suspended")game.audio.ctx.resume();
-      if(game.musicTheme&&game.audio.theme!==game.musicTheme)startMusic(game.musicTheme);
+      if(game.save.settings.music&&game.musicTheme&&(game.audio.theme!==game.musicTheme||game.audio.bgm?.paused))startMusic(game.musicTheme);
       return game.audio;
     } catch { return null; }
   }
@@ -583,13 +688,23 @@
   function musicAccent(theme,step,now,beat){if(step%8!==4)return;const name=theme.biomeKey,depth=theme.depth||0;if(name==="title")synthTone(midiFreq(76),beat*2,"sine",.014,now,"music",1.5);else if(name==="camp")synthTone(midiFreq(71),beat*1.7,"triangle",.015,now,"music",.75);else if(name==="forest")synthTone(midiFreq(80+depth),beat*.7,"sine",.012,now,"music",1.3);else if(name==="waste"){noiseBurst(.11,.008+depth*.001,"music");synthTone(68+depth*5,beat*.8,"square",.012,now,"music",.62);}else if(name==="tundra")synthTone(midiFreq(86+depth),beat*2.2,"sine",.014,now,"music",.5);else if(name==="peaks"){noiseBurst(.06,.011+depth*.001,"music");synthTone(1260+depth*55,beat*.34,"square",.008,now,"music",.28);}else if(name==="abyss"){synthTone(48+depth*2,beat*3,"sawtooth",.011,now,"music",.72);synthTone(53+depth,beat*3,"sine",.008,now,"music",.68);}}
 
   function startMusic(name) {
-    game.musicTheme=name;const a=game.audio?.ctx?game.audio:null;if(!a)return;if(a.musicTimer)clearTimeout(a.musicTimer);a.theme=name;a.step=0;const theme=resolveMusicTheme(name);document.documentElement.dataset.bgmTrack=theme.trackName;document.documentElement.dataset.bgmKey=name;
-    const tick=()=>{if(!game.audio||game.audio.theme!==name)return;document.documentElement.dataset.bgmState=a.ctx.state;if(a.ctx.state!=="running"){a.musicTimer=setTimeout(tick,250);return;}const beat=60/theme.tempo/2,step=a.step++,now=a.ctx.currentTime+.035,lead=theme.lead[step%theme.lead.length],bass=theme.bass[Math.floor(step/2)%theme.bass.length],pulse=theme.pulse?.[step%theme.pulse.length]??1;document.documentElement.dataset.bgmStep=String(step);
-      if(step%8===0){const root=theme.bass[Math.floor(step/8)%theme.bass.length]+12,chord=theme.depth===5?[root,root+3,root+7]:[root,root+4,root+7];synthPad(chord,beat*8.6,theme.biomeKey==="abyss"?"triangle":"sine",theme.depth===5?.011:.0095,now);}
-      synthTone(midiFreq(lead),beat*.9,theme.wave,(.018+theme.color*.025)*(pulse?.95:.58),now,"music");if(step%2===0)synthTone(midiFreq(bass),beat*1.9,theme.biomeKey==="abyss"?"sawtooth":"triangle",.015+(theme.depth||0)*.0008,now,"music");if(pulse&&step%4===2&&["waste","peaks"].includes(theme.biomeKey))noiseBurst(.05,.0055,"music");musicAccent(theme,step,now,beat);a.musicTimer=setTimeout(tick,beat*1000);};tick();
+    game.musicTheme=name;const a=game.audio?.ctx?game.audio:null;const track=resolveBgmTrack(name);document.documentElement.dataset.bgmTrack=track.title;document.documentElement.dataset.bgmKey=name;if(!a?.bgm)return;if(a.musicTimer)clearTimeout(a.musicTimer);a.theme=name;
+    if(!game.save.settings.music){a.bgm.pause();a.bgm.muted=true;a.music.gain.value=0;document.documentElement.dataset.bgmState="muted";return;}
+    a.bgm.muted=false;a.music.gain.value=.62*game.save.settings.bgmVolume;
+    if(a.bgm.dataset.key!==name){a.bgm.pause();a.bgm.src=track.src;a.bgm.dataset.key=name;a.bgm.load();}
+    a.bgm.volume=game.save.settings.bgmVolume;a.bgm.onplaying=()=>{document.documentElement.dataset.bgmState=game.save.settings.music?"playing":"muted";};a.bgm.onerror=()=>{document.documentElement.dataset.bgmState="error";};document.documentElement.dataset.bgmState="loading";
+    const pending=a.bgm.play();if(pending)pending.catch(()=>{document.documentElement.dataset.bgmState="blocked";});
   }
 
-  function setMusicTheme(name){game.musicTheme=name;if(game.audio?.ctx&&game.audio.theme!==name)startMusic(name);}
+  function setMusicTheme(name){game.musicTheme=name;if(game.audio?.ctx&&(game.audio.theme!==name||game.audio.bgm?.paused))startMusic(name);}
+
+  function updateSettingsControls(){const music=$("settings-music-toggle"),sound=$("settings-sound-toggle"),slider=$("bgm-volume"),text=$("bgm-volume-text"),enabled=game.save.settings.music!==false,soundEnabled=game.save.settings.sound!==false,volume=Math.round(game.save.settings.bgmVolume*100);if(music){music.textContent=enabled?"开启":"关闭";music.setAttribute("aria-checked",String(enabled));}if(sound){sound.textContent=soundEnabled?"开启":"关闭";sound.setAttribute("aria-checked",String(soundEnabled));}if(slider)slider.value=String(volume);if(text)text.textContent=`${volume}%`;document.documentElement.dataset.musicEnabled=String(enabled);document.documentElement.dataset.bgmVolume=String(volume);document.documentElement.dataset.soundEnabled=String(soundEnabled);}
+
+  function setMusicEnabled(enabled,announce=true){game.save.settings.music=Boolean(enabled);try{localStorage.setItem(MUSIC_PREF_KEY,enabled?"on":"off");}catch{}const a=game.audio;if(a?.bgm){a.bgm.muted=!enabled;if(!enabled){a.bgm.pause();a.music.gain.value=0;document.documentElement.dataset.bgmState="muted";}else{a.music.gain.value=.62*game.save.settings.bgmVolume;startMusic(game.musicTheme||"title");}}else if(enabled){ensureAudio();startMusic(game.musicTheme||"title");}else document.documentElement.dataset.bgmState="muted";updateSettingsControls();if(game.scene!=="title")saveGame(true);if(announce)toast(enabled?"背景音乐已开启":"背景音乐已关闭",enabled?"#9de7ff":"#b7b3bd");game.qaUpdateStatus?.();}
+
+  function setBgmVolume(value,announce=false){const volume=clamp(Number(value)||0,0,1);game.save.settings.bgmVolume=volume;try{localStorage.setItem(MUSIC_VOLUME_PREF_KEY,String(volume));}catch{}if(game.audio){game.audio.music.gain.value=game.save.settings.music?.62*volume:0;if(game.audio.bgm)game.audio.bgm.volume=volume;}updateSettingsControls();if(game.scene!=="title")saveGame(true);if(announce)toast(`背景音乐音量 ${Math.round(volume*100)}%`,"#ffe09a");}
+
+  function setSoundEnabled(enabled,announce=true){game.save.settings.sound=Boolean(enabled);try{localStorage.setItem(SOUND_PREF_KEY,enabled?"on":"off");}catch{}if(game.audio?.sfx)game.audio.sfx.gain.value=enabled?.82:0;updateSettingsControls();if(game.scene!=="title")saveGame(true);if(announce)toast(enabled?"战斗音效已开启":"战斗音效已关闭",enabled?"#9de7ff":"#b7b3bd");}
 
   function playSfx(name) {
     if(!ensureAudio())return;const now=game.audio.ctx.currentTime;
@@ -610,11 +725,11 @@
 
   function beep(freq = 220, duration = .07, type = "square", gain = .035) { if(game.save.settings.sound)synthTone(freq,duration,type,gain); }
 
-  function generateItem(region = game.biome, depth = game.depth, forcedMin = 0, rng = new RNG(Date.now() + Math.random())) {
+  function generateItem(region = game.biome, depth = game.depth, forcedMin = 0, rng = new RNG(Date.now() + Math.random()), maxQuality = 4) {
     const progress = region * 5 + depth;
     let roll = rng.next() + region * .022 + depth * .012 + game.save.skills.explore.alchemy * .1;
     let qi = roll > .992 ? 4 : roll > .92 ? 3 : roll > .73 ? 2 : roll > .42 ? 1 : 0;
-    qi = Math.max(qi, forcedMin);
+    qi = clamp(Math.max(qi, forcedMin),0,maxQuality);
     const q = QUALITIES[qi];
     const slot = rng.pick(Object.keys(SLOT_NAMES));
     const weaponType = slot === "weapon" ? rng.pick(WEAPON_TYPES) : null;
@@ -639,7 +754,7 @@
     const legendary = qi === 4 ? rng.pick(LEGENDARIES) : null;
     return {
       id: `${Date.now().toString(36)}-${Math.floor(rng.next() * 1e7).toString(36)}`,
-      name: `${qi >= 3 ? q.name + "·" : ""}${rng.pick(nameRoots)}${itemSuffix}`,
+      name: `${rng.pick(nameRoots)}${itemSuffix}`,
       slot, quality: q.id, level: itemLevel, enhance: 0, weaponType,
       main: { type: mainType, value: mainValue }, affixes, region,
       legendary: legendary ? { id: legendary[0], name: legendary[1], text: legendary[2] } : null,
@@ -667,7 +782,7 @@
 
   function pickupGroundDrop(drop) {
     if(drop.kind==="equipment")addItem(drop.item);
-    else if(drop.kind==="potion"){if(game.save.player.potions>=8)return toast("药水袋已满（8 / 8）","#efc46d");game.save.player.potions++;toast("拾取生命药水 ×1","#8be89f");}
+    else if(drop.kind==="potion"){if(game.save.player.potions>=POTION_CAPACITY)return toast(`药水袋已满（${POTION_CAPACITY} / ${POTION_CAPACITY}）`,"#efc46d");game.save.player.potions++;toast("拾取生命药水 ×1","#8be89f");}
     else if(drop.kind==="material"){game.save.materials[drop.material]=(game.save.materials[drop.material]||0)+(drop.amount||1);game.runLoot.materials+=drop.amount||1;toast(`拾取 ${MATERIAL_NAMES[drop.material]} ×${drop.amount||1}`,BIOMES[game.biome].accent);}
     game.groundDrops=game.groundDrops.filter(d=>d!==drop);updateHUD();beep(520,.1,"triangle",.03);
   }
@@ -678,6 +793,7 @@
     localStorage.removeItem(SAVE_KEY);
     localStorage.removeItem(BACKUP_SAVE_KEY);
     game.save = freshSave();
+    setMusicEnabled(game.save.settings.music,false);
     game.unseenItems = 0;
     const starter = generateItem(0, 1, 0, new RNG("starter-sword"));
     starter.name = "破旧铁剑"; starter.slot = "weapon"; starter.quality = "white"; starter.main = { type: "attack", value: 7 }; starter.affixes = [];
@@ -692,9 +808,9 @@
   }
 
   function loadDecodedGame(loaded) {
-    if(!loaded)return toast("这个档位为空或已损坏","#ef7268");game.save=loaded.save;game.unseenItems=0;
+    if(!loaded)return toast("这个档位为空或已损坏","#ef7268");game.save=loaded.save;game.save.settings.music=readMusicPreference();game.save.settings.sound=readSoundPreference();game.save.settings.bgmVolume=readBgmVolumePreference();game.unseenItems=0;setMusicEnabled(game.save.settings.music,false);setSoundEnabled(game.save.settings.sound,false);setBgmVolume(game.save.settings.bgmVolume);
     if(loaded.session?.scene==="expedition")restoreSession(loaded.session);else enterCamp(false);
-    if(loaded.source==="backup")toast("主存档异常，已从备份恢复","#ffd36b");else if(loaded.migrated)toast("旧版存档已迁移为新版格式","#9de7ff");else toast("星火回应了你的归来");
+    if(loaded.source==="backup")toast("主存档异常，已从备份恢复","#ffd36b");else if(loaded.source==="full-unlock-template")toast("已载入内置全解锁测试档","#a5f0ce");else if(loaded.migrated)toast("旧版存档已迁移为新版格式","#9de7ff");else toast("星火回应了你的归来");
     saveGame(true);
   }
 
@@ -704,9 +820,11 @@
     const biome=clamp(Number(session.biome)||0,0,4),depth=clamp(Number(session.depth)||1,1,5);game.biome=biome;game.depth=depth;game.scene="expedition";game.paused=false;game.zoneTime=0;game.runLoot=session.runLoot||{gold:0,materials:0,kills:0};
     game.world=generateMap(session.world?.seed||`${BIOMES[biome].id}-restored-${depth}`,biome,depth);game.world.revealed=new Set(session.world?.revealed||[]);
     const savedWorld=session.world||{};if(savedWorld.exit){game.world.exit={...savedWorld.exit};game.world.exitSpawned=true;game.world.exitLocked=!!savedWorld.exitLocked;game.world.tiles[game.world.exit.y][game.world.exit.x]=4;}else if(savedWorld.exitLocked===false){game.world.exit={...game.world.fallbackExit};game.world.exitSpawned=true;game.world.exitLocked=false;game.world.tiles[game.world.exit.y][game.world.exit.x]=4;}
-    game.player.x=session.player?.x??((game.world.start.x+.5)*TILE);game.player.y=session.player?.y??((game.world.start.y+.5)*TILE);game.player.dirX=session.player?.dirX??1;game.player.dirY=session.player?.dirY??0;game.player.vx=game.player.vy=0;game.player.invuln=1.8;game.player.swing=null;game.player.statuses={};
+    game.player.x=session.player?.x??((game.world.start.x+.5)*TILE);game.player.y=session.player?.y??((game.world.start.y+.5)*TILE);game.player.dirX=session.player?.dirX??1;game.player.dirY=session.player?.dirY??0;game.player.vx=game.player.vy=0;game.player.invuln=1.8;game.player.swing=null;game.player.weaponDrawn=0;game.player.statuses={};
     game.enemies=[];(session.enemies||[]).forEach(saved=>{spawnEnemy(saved.typeIndex||0,saved.x,saved.y,!!saved.boss);const e=game.enemies[game.enemies.length-1];Object.assign(e,saved,{attack:saved.boss?null:ENEMY_ATTACKS[biome][saved.typeIndex||0],state:"patrol",stateTime:0,vx:0,vy:0,dead:false,statuses:saved.statuses||{}});});
-    game.resources=(session.resources||[]).map(r=>({...r}));game.altars=(session.altars||[]).map(a=>({...a}));game.groundDrops=(session.groundDrops||[]).map(d=>({...d}));game.telegraphs=[];game.projectiles=[];game.impacts=[];game.particles=[];game.numbers=[];game.camera.x=game.camera.y=0;
+    // Legacy saves may contain fixed map resources. Materials now come from
+    // defeated monsters, so old resource nodes are deliberately retired.
+    game.resources=[];game.altars=(session.altars||[]).map(a=>({...a}));game.groundDrops=(session.groundDrops||[]).map(d=>({...d}));game.telegraphs=[];game.projectiles=[];game.impacts=[];game.particles=[];game.numbers=[];game.camera.x=game.camera.y=0;
     const floorCleared=depth<5&&!game.enemies.some(e=>!e.dead&&!e.boss),bossCleared=depth===5&&!game.enemies.some(e=>!e.dead&&e.boss);
     if(!game.world.exitSpawned&&(floorCleared||bossCleared))spawnExitNearPlayer(false);
     $("title-screen").classList.add("hidden");$("death-panel").classList.add("hidden");$("hud").classList.remove("hidden");closeAllModals();setMusicTheme(stageMusicKey(biome,depth));updateCamera(1);updateHUD();
@@ -715,7 +833,7 @@
   function enterCamp(first = false) {
     game.scene = "camp"; game.paused = false; game.world = null; game.enemies = []; game.resources = []; game.telegraphs = []; game.projectiles = []; game.impacts = []; game.altars = []; game.groundDrops=[];
     const st = stats(); game.save.player.hp = st.maxHp; game.save.player.stamina = 100; game.save.player.potions = Math.max(3, game.save.player.potions);
-    game.player.x = W / 2; game.player.y = H / 2 + 80; game.player.vx = game.player.vy = 0; game.camera.x = game.camera.y = 0;
+    game.player.x = W / 2; game.player.y = H / 2 + 80; game.player.vx = game.player.vy = 0; game.player.swing = null; game.player.weaponDrawn = 0; game.camera.x = game.camera.y = 0;
     $("title-screen").classList.add("hidden"); $("death-panel").classList.add("hidden"); $("hud").classList.remove("hidden");
     setMusicTheme("camp");
     closeAllModals(); renderContinentPanel(); updateHUD(); saveGame(true);
@@ -778,7 +896,7 @@
     game.world = generateMap(seed, biomeIndex, depth);
     const w = game.world;
     game.player.x = (w.start.x + .5) * TILE; game.player.y = (w.start.y + .5) * TILE;
-    game.player.vx = game.player.vy = 0; game.player.invuln = 2.2; game.player.swing = null;
+    game.player.vx = game.player.vy = 0; game.player.invuln = 2.2; game.player.swing = null; game.player.weaponDrawn = 0;
     game.enemies = []; game.resources = []; game.telegraphs = []; game.projectiles = []; game.impacts = []; game.altars = []; game.particles = []; game.numbers = []; game.groundDrops=[];
     const rng = w.rng;
     const occupied = new Set();
@@ -790,11 +908,8 @@
       }
       return rng.pick(w.floorCells);
     };
-    const resourceCount = 10 + depth * 2;
-    for (let i = 0; i < resourceCount; i++) {
-      const p = pickCell(5);
-      game.resources.push({ x: (p.x + .5) * TILE, y: (p.y + .5) * TILE, type: i % 3 ? biome.primary : biome.ore, rich: rng.next() > .86, gathered: false });
-    }
+    // Field resources were replaced by monster-carried material drops so every
+    // scene pickup has a combat source and uses the same pickup presentation.
     const count = depth === 5 ? 12 + biomeIndex * 2 : 9 + depth * 2 + biomeIndex * 2;
     for (let i = 0; i < count; i++) {
       const p = pickCell(8); spawnEnemy(i % 4, (p.x + .5) * TILE, (p.y + .5) * TILE, false);
@@ -834,9 +949,9 @@
     else e.vy = 0;
   }
 
-  function spawnProjectile({ x, y, dx, dy, speed = 250, damage = 10, team = "enemy", effect = 5, radius = 9, life = 2.4, status = null, homing = 0, pierce = 0, owner = null, monsterFx = null }) {
+  function spawnProjectile({ x, y, dx, dy, speed = 250, damage = 10, team = "enemy", effect = 5, radius = 9, life = 2.4, status = null, homing = 0, pierce = 0, owner = null, monsterFx = null, playerFx = null }) {
     const len = Math.hypot(dx, dy) || 1;
-    game.projectiles.push({ x, y, vx: dx / len * speed, vy: dy / len * speed, damage, team, effect, radius, life, status, homing, pierce, owner, monsterFx, spin: Math.random() * Math.PI * 2 });
+    game.projectiles.push({ x, y, vx: dx / len * speed, vy: dy / len * speed, damage, team, effect, radius, life, status, homing, pierce, owner, monsterFx, playerFx, spin: Math.random() * Math.PI * 2 });
   }
 
   function spawnImpact(x, y, effect = 10, size = 46, life = .28) {
@@ -888,29 +1003,33 @@
     const len=Math.hypot(dx,dy)||1;game.player.dirX=dx/len;game.player.dirY=dy/len;game.player.aimAngle=Math.atan2(game.player.dirY,game.player.dirX);
   }
 
-  function attack(fromKeyboard = false) {
+  function hasAutoAimLine(target){if(!game.world)return true;const p=game.player,dx=target.x-p.x,dy=target.y-p.y,d=Math.hypot(dx,dy),steps=Math.max(1,Math.ceil(d/18));for(let i=1;i<steps;i++){const t=i/steps;if(!isWalkable(p.x+dx*t,p.y+dy*t))return false;}return true;}
+
+  function autoAimRange(){const type=equippedWeaponType();return type==="staff"?540:type==="spear"?460:380;}
+
+  function autoAimTarget(force=false){const p=game.player,now=performance.now(),range=autoAimRange(),valid=e=>e&&!e.dead&&e.hp>0&&dist(e,p)<=range&&hasAutoAimLine(e);if(!force&&valid(p.aimTarget)&&now<(p.aimLockUntil||0))return p.aimTarget;const facing=Number.isFinite(p.aimAngle)?p.aimAngle:Math.atan2(p.dirY,p.dirX),candidates=game.enemies.filter(valid).map(e=>{const d=dist(e,p),angle=Math.atan2(e.y-p.y,e.x-p.x),delta=Math.abs(Math.atan2(Math.sin(angle-facing),Math.cos(angle-facing))),threat=(e.boss?125:e.elite?52:0)+(e.state==="windup"?46:0)+(e.attack?.range>180?14:0);return{e,score:d+delta*34-threat};}).sort((a,b)=>a.score-b.score);const chosen=candidates[0]?.e||null;p.aimTarget=chosen;p.aimLockUntil=chosen?now+(force?520:260):0;document.documentElement.dataset.autoAimTarget=chosen?.name||"none";return chosen;}
+
+  function updateAutoAim(force=false){const p=game.player;if(game.scene!=="expedition"||p.swing)return null;const target=autoAimTarget(force);if(target){setPlayerAim(target.x-p.x,target.y-p.y);document.documentElement.dataset.autoAimAngle=p.aimAngle.toFixed(3);}return target;}
+
+  function attack() {
     if (game.scene !== "expedition" || game.paused || isModalOpen() || game.player.attackCd > 0 || game.player.dash > 0) return;
     const p = game.player; const st = stats(); const now = performance.now() / 1000; const weaponType = equippedWeaponType(); const profile = WEAPON_PROFILES[weaponType];
     p.combo = now <= p.comboUntil ? p.combo % 3 + 1 : 1; p.comboUntil = now + .62;
-    let dx = p.dirX, dy = p.dirY;
-    if (!fromKeyboard) {
-      const wx = game.mouse.x + game.camera.x, wy = game.mouse.y + game.camera.y;
-      const len = Math.hypot(wx - p.x, wy - p.y) || 1; dx = (wx - p.x) / len; dy = (wy - p.y) / len;
-    }
+    updateAutoAim(true);let dx = p.dirX, dy = p.dirY;
     setPlayerAim(dx,dy);dx=p.dirX;dy=p.dirY;
-    const duration = (p.combo === 3 ? .44 : p.combo === 2 ? .29 : .24) / profile.speed;
+    const finisherDuration={sword:.4,spear:.36,axe:.64,staff:.44,daggers:.5}[weaponType],duration = (p.combo === 3 ? finisherDuration : p.combo === 2 ? .29 : .24) / profile.speed;
     p.attackCd = duration / st.attackSpeed;
-    p.swing = { t: duration, max: duration, combo: p.combo, dx, dy, hits: new Set(), weaponType, profile, fired: false };
+    p.swing = { t: duration, max: duration, combo: p.combo, dx, dy, hits: new Set(), weaponType, profile, fired: false, daggerStage:0, daggerHits:[new Set(),new Set(),new Set()], comboFx:`${weaponType}-${p.combo}` };
+    document.documentElement.dataset.comboFx=p.swing.comboFx;
     p.recoveryPose=0;
-    if (weaponType === "spear" && p.combo === 3) { p.vx += dx * 145; p.vy += dy * 145; }
-    if (weaponType === "daggers" && p.combo === 3) moveEntity(p,dx*24,dy*24,p.radius);
+    if (weaponType === "spear" && p.combo === 3) { p.dash=Math.max(p.dash,.22);p.invuln=Math.max(p.invuln,.12);p.vx=dx*500;p.vy=dy*500; }
     playWeaponSfx(weaponType,p.combo);
   }
 
   function useActiveSkill(slot=1) {
     if(game.scene!=="expedition"||game.paused||isModalOpen())return;const p=game.player,st=stats(),type=equippedWeaponType();
     if(slot===2){if(p.activeCd2>0)return toast(`星爆术冷却 ${p.activeCd2.toFixed(1)} 秒`,"#d4b0ff");if(game.save.player.stamina<45)return toast("耐力不足","#e5cf69");game.save.player.stamina-=45;p.activeCd2=9;p.recoveryPose=.55;game.enemies.filter(e=>!e.dead&&dist(e,p)<165).forEach(e=>{const a=Math.atan2(e.y-p.y,e.x-p.x),crit=Math.random()<st.critRate;damageEnemy(e,st.attack*2.15*offensiveMultiplier(e)*(crit?st.critDamage:1),crit,Math.cos(a)*230,Math.sin(a)*230);});for(let i=0;i<12;i++){const a=i/12*Math.PI*2;spawnProjectile({x:p.x,y:p.y,dx:Math.cos(a),dy:Math.sin(a),speed:235,damage:st.attack*.65,team:"player",effect:9,radius:9,life:.75,pierce:1});}spawnImpact(p.x,p.y,9,175,.55);burst(p.x,p.y,"#e4a4ff",30,230);playWeaponSfx("staff",3);return;}
-    if(p.activeCd1>0)return toast(`武器战技冷却 ${p.activeCd1.toFixed(1)} 秒`,"#ffe09a");if(game.save.player.stamina<28)return toast("耐力不足","#e5cf69");game.save.player.stamina-=28;p.activeCd1=5.2;p.recoveryPose=.48;const dx=Math.cos(p.aimAngle),dy=Math.sin(p.aimAngle),hit=(e,mult,knock=180)=>{const crit=Math.random()<st.critRate;damageEnemy(e,st.attack*mult*offensiveMultiplier(e)*(crit?st.critDamage:1),crit,dx*knock,dy*knock);rollOffensiveAffixes(e);};
+    if(p.activeCd1>0)return toast(`武器战技冷却 ${p.activeCd1.toFixed(1)} 秒`,"#ffe09a");if(game.save.player.stamina<28)return toast("耐力不足","#e5cf69");updateAutoAim(true);game.save.player.stamina-=28;p.activeCd1=5.2;p.recoveryPose=.48;p.weaponDrawn=.48;const dx=Math.cos(p.aimAngle),dy=Math.sin(p.aimAngle),hit=(e,mult,knock=180)=>{const crit=Math.random()<st.critRate;damageEnemy(e,st.attack*mult*offensiveMultiplier(e)*(crit?st.critDamage:1),crit,dx*knock,dy*knock);rollOffensiveAffixes(e);};
     if(type==="staff"){for(let i=-2;i<=2;i++){const a=p.aimAngle+i*.18;spawnProjectile({x:p.x,y:p.y,dx:Math.cos(a),dy:Math.sin(a),speed:390,damage:st.attack*1.35,team:"player",effect:3,radius:12,pierce:2});}}
     else if(type==="sword"){game.enemies.filter(e=>!e.dead&&dist(e,p)<105).forEach(e=>hit(e,1.8,250));spawnImpact(p.x,p.y,0,150,.42);}
     else if(type==="axe"){game.enemies.filter(e=>!e.dead&&dist(e,p)<135).forEach(e=>hit(e,2.45,360));spawnImpact(p.x+dx*34,p.y+dy*34,2,180,.5);game.screenShake=12;}
@@ -961,7 +1080,7 @@
       game.runLoot.materials += amount; numberFx(resource.x, resource.y - 18, `+${amount} ${MATERIAL_NAMES[resource.type]}`, BIOMES[game.biome].accent);
       burst(resource.x, resource.y, BIOMES[game.biome].accent, 10, 80); beep(380, .08, "square", .025); updateHUD(); return;
     }
-    if(!game.world.exit)return toast("清除本层所有敌人后，星门才会显现","#efc46d");
+    if(!game.world.exit){if(location.search.includes("qa=1"))markQa("interact:none",{ok:true,phase:"empty-interaction"});return;}
     const ex = { x: (game.world.exit.x + .5) * TILE, y: (game.world.exit.y + .5) * TILE };
     if (dist(ex, p) < 55) {
       if (game.world.exitLocked) return toast("击败区域领主后，星门才会回应", "#ef7168");
@@ -976,8 +1095,6 @@
     game.save.progress.completedDepths[game.biome] = 5;
     if (game.biome < BIOMES.length - 1 && !game.save.progress.unlocked.includes(game.biome + 1)) game.save.progress.unlocked.push(game.biome + 1);
     const biome = BIOMES[game.biome];
-    game.save.materials[biome.core] = (game.save.materials[biome.core] || 0) + 1;
-    addItem(generateItem(game.biome, 5, 2, new RNG(Date.now())));
     toast(`${biome.name}的元素核心已重新封印！`, biome.accent); beep(660, .45, "triangle", .05);
     saveGame(true); enterCamp(false); setTimeout(() => openPanel("continent-panel"), 600);
   }
@@ -1033,11 +1150,13 @@
       spawnGroundDrop("equipment",e.x-20,e.y,{item:generateItem(game.biome, game.depth, 2, new RNG(Date.now() + "boss1"))});
       spawnGroundDrop("equipment",e.x+20,e.y,{item:generateItem(game.biome, game.depth, 1, new RNG(Date.now() + "boss2"))});
       spawnGroundDrop("potion",e.x,e.y+18);spawnGroundDrop("potion",e.x,e.y+18);
+      spawnGroundDrop("material",e.x,e.y-20,{material:BIOMES[game.biome].core,amount:1});
       spawnExitNearPlayer(true);
     } else if (Math.random() < .115 + game.save.skills.explore.alchemy * .08) {
-      spawnGroundDrop("equipment",e.x,e.y,{item:generateItem(game.biome, game.depth)});
+      spawnGroundDrop("equipment",e.x,e.y,{item:generateItem(game.biome, game.depth, 0, new RNG(Date.now()+e.name+e.x), 3)});
     }
     const biome=BIOMES[game.biome],rareChance=e.boss?1:Math.min(.92,(e.elite?.72:.07+game.depth*.012)*(1+statValue("rareFind")));
+    if(!e.boss){const material=Math.random()<.3?biome.ore:biome.primary,amount=e.elite?2:1;spawnGroundDrop("material",e.x,e.y,{material,amount});}
     if(Math.random()<rareChance){const amount=e.boss?2:1;spawnGroundDrop("material",e.x,e.y,{material:biome.rare,amount});numberFx(e.x,e.y-46,`${biome.rareName} ×${amount}`,biome.accent);}
     if(!e.boss&&Math.random()<(e.elite?.24:.055))spawnGroundDrop("potion",e.x,e.y);
     if(!e.boss&&game.depth<5&&!game.enemies.some(enemy=>!enemy.dead&&!enemy.boss))spawnExitNearPlayer(true);
@@ -1069,56 +1188,68 @@
     }
   }
 
-  function addCircle(x, y, r, delay, damage, color, status = null, effect = 0) {
-    game.telegraphs.push({ type: "circle", x, y, r, life: delay, max: delay, damage, color, status, effect });
+  function emitBossMoveFx(e,dt){
+    if(!e.boss||Math.hypot(e.vx||0,e.vy||0)<18)return;e.moveFxTick=(e.moveFxTick||0)-dt;if(e.moveFxTick>0)return;e.moveFxTick=.075;
+    const kinds=["leaf","ember","ice","spark","void"],colors=["#8fd56e","#ff8b43","#d9f7ff","#c69aff","#f15abd"],kind=kinds[game.biome],color=colors[game.biome],speed=Math.hypot(e.vx,e.vy)||1;
+    for(let i=0;i<2;i++){const side=(Math.random()-.5)*e.radius*1.15;game.particles.push({x:e.x-e.vx/speed*e.radius*.55-e.vy/speed*side,y:e.y+e.radius*.52-e.vy/speed*e.radius*.18+e.vx/speed*side,vx:-e.vx*.12+(Math.random()-.5)*45,vy:-25-Math.random()*35,life:.42+Math.random()*.3,max:.72,color,size:4+Math.random()*5,kind,rotation:Math.random()*Math.PI*2,spin:(Math.random()-.5)*8});}
   }
 
-  function addLine(x, y, x2, y2, width, delay, damage, color, status = null, effect = 0, specialFx = null) {
-    game.telegraphs.push({ type: "line", x, y, x2, y2, width, life: delay, max: delay, damage, color, status, effect, specialFx });
+  function addCircle(x, y, r, delay, damage, color, status = null, effect = 0, monsterFx = null) {
+    game.telegraphs.push({ type: "circle", x, y, r, life: delay, max: delay, damage, color, status, effect, monsterFx });
   }
 
-  function addCone(x, y, angle, range, arc, delay, damage, color, status = null, effect = 0) {
-    game.telegraphs.push({ type: "cone", x, y, angle, range, arc, life: delay, max: delay, damage, color, status, effect });
+  function addLine(x, y, x2, y2, width, delay, damage, color, status = null, effect = 0, specialFx = null, monsterFx = null) {
+    game.telegraphs.push({ type: "line", x, y, x2, y2, width, life: delay, max: delay, damage, color, status, effect, specialFx, monsterFx });
   }
 
-  function fireRadial(e, count, speed, effect, damage, status = null, offset = 0) {
-    for (let i = 0; i < count; i++) { const a = i / count * Math.PI * 2 + offset; spawnProjectile({ x:e.x, y:e.y, dx:Math.cos(a), dy:Math.sin(a), speed, effect, damage, status, owner:e }); }
+  function addCone(x, y, angle, range, arc, delay, damage, color, status = null, effect = 0, monsterFx = null) {
+    game.telegraphs.push({ type: "cone", x, y, angle, range, arc, life: delay, max: delay, damage, color, status, effect, monsterFx });
   }
 
-  function startCharge(e, tx, ty, speed, duration, damage, status = null) {
-    const len = Math.hypot(tx - e.x, ty - e.y) || 1; e.state = "charge"; e.stateTime = duration; e.vx = (tx - e.x) / len * speed; e.vy = (ty - e.y) / len * speed; e.chargeDamage = damage; e.chargeStatus = status; e.chargeHit = false;
+  function fireRadial(e, count, speed, effect, damage, status = null, offset = 0, monsterFx = null) {
+    for (let i = 0; i < count; i++) { const a = i / count * Math.PI * 2 + offset; spawnProjectile({ x:e.x, y:e.y, dx:Math.cos(a), dy:Math.sin(a), speed, effect, damage, status, owner:e, monsterFx }); }
+  }
+
+  function startCharge(e, tx, ty, speed, duration, damage, status = null, monsterFx = null) {
+    const len = Math.hypot(tx - e.x, ty - e.y) || 1; e.state = "charge"; e.stateTime = duration; e.vx = (tx - e.x) / len * speed; e.vy = (ty - e.y) / len * speed; e.chargeDamage = damage; e.chargeStatus = status; e.chargeHit = false; e.chargeMonsterFx = monsterFx;
   }
 
   function bossSpecial(e) {
     const p = game.player, biome = game.biome, pattern = e.pattern++ % 4, enraged = e.hp < e.maxHp * .45;
     if (enraged && !e.enraged) { e.enraged = true; toast(`${e.name}进入元素暴走阶段！`, BIOMES[biome].accent); }
-    const bonus = enraged ? 3 : 0, aim = Math.atan2(p.y - e.y, p.x - e.x);
+    const bonus = enraged ? 3 : 0, aim = Math.atan2(p.y - e.y, p.x - e.x), bossFx = { col: biome, row: pattern };
+    e.activeBossFx=bossFx;
+    const circle = (...args) => addCircle(...args, bossFx);
+    const line = (...args) => addLine(...args, null, bossFx);
+    const cone = (...args) => addCone(...args, bossFx);
+    const radial = (...args) => fireRadial(...args, bossFx);
+    const charge = (...args) => startCharge(...args, bossFx);
     spawnMonsterFx(e.x+Math.cos(aim)*42,e.y+Math.sin(aim)*36,biome,pattern,aim,155,.68);
     if (biome === 0) {
-      if (pattern === 0) { addCircle(p.x,p.y,58,.82,e.damage*1.2,"#82d764","stun",10); for(let i=0;i<6+bonus;i++){const a=i/(6+bonus)*Math.PI*2;addCircle(p.x+Math.cos(a)*98,p.y+Math.sin(a)*98,28,.95,e.damage*.8,"#6fbd55","poison",10);} }
-      if (pattern === 1) { fireRadial(e,10+bonus,155,5,e.damage*.72,"poison",game.zoneTime); if(game.enemies.filter(x=>!x.dead&&!x.boss).length<18){for(let i=0;i<(enraged?3:2);i++){const a=i*Math.PI+(Math.random()-.5);spawnEnemy(1,e.x+Math.cos(a)*75,e.y+Math.sin(a)*75,false);}} }
-      if (pattern === 2) { for(let i=0;i<4+(enraged?2:0);i++){const a=i/(4+(enraged?2:0))*Math.PI;addLine(e.x-Math.cos(a)*260,e.y-Math.sin(a)*260,e.x+Math.cos(a)*260,e.y+Math.sin(a)*260,22,.88,e.damage,"#9be071","stun",10);} }
-      if (pattern === 3) { for(let i=-2-bonus;i<=2+bonus;i++){const a=aim+i*.13;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(a),dy:Math.sin(a),speed:215,effect:5,damage:e.damage*.65,status:"poison",owner:e});} }
+      if (pattern === 0) { circle(p.x,p.y,58,.82,e.damage*1.2,"#82d764","stun",10); for(let i=0;i<6+bonus;i++){const a=i/(6+bonus)*Math.PI*2;circle(p.x+Math.cos(a)*98,p.y+Math.sin(a)*98,28,.95,e.damage*.8,"#6fbd55","poison",10);} }
+      if (pattern === 1) { radial(e,10+bonus,155,5,e.damage*.72,"poison",game.zoneTime); if(game.enemies.filter(x=>!x.dead&&!x.boss).length<18){for(let i=0;i<(enraged?3:2);i++){const a=i*Math.PI+(Math.random()-.5);spawnEnemy(1,e.x+Math.cos(a)*75,e.y+Math.sin(a)*75,false);}} }
+      if (pattern === 2) { for(let i=0;i<4+(enraged?2:0);i++){const a=i/(4+(enraged?2:0))*Math.PI;line(e.x-Math.cos(a)*260,e.y-Math.sin(a)*260,e.x+Math.cos(a)*260,e.y+Math.sin(a)*260,22,.88,e.damage,"#9be071","stun",10);} }
+      if (pattern === 3) { for(let i=-2-bonus;i<=2+bonus;i++){const a=aim+i*.13;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(a),dy:Math.sin(a),speed:215,effect:5,damage:e.damage*.65,status:"poison",owner:e,monsterFx:bossFx});} }
     } else if (biome === 1) {
-      if (pattern === 0) addCone(e.x,e.y,aim,250,1.18,.78,e.damage*1.25,"#ff7138","burn",6);
-      if (pattern === 1) for(let i=0;i<7+bonus;i++) addCircle(p.x+(Math.random()-.5)*270,p.y+(Math.random()-.5)*210,34,.65+i*.09,e.damage,"#ff723c","burn",6);
-      if (pattern === 2) startCharge(e,p.x,p.y,enraged?480:410,.72,e.damage*1.45,"burn");
-      if (pattern === 3) { fireRadial(e,12+bonus,190,6,e.damage*.72,"burn",game.zoneTime); for(let i=0;i<8;i++){const a=i/8*Math.PI*2;addCircle(e.x+Math.cos(a)*120,e.y+Math.sin(a)*120,30,.9,e.damage*.8,"#f05a31","burn",6);} }
+      if (pattern === 0) cone(e.x,e.y,aim,250,1.18,.78,e.damage*1.25,"#ff7138","burn",6);
+      if (pattern === 1) for(let i=0;i<7+bonus;i++) circle(p.x+(Math.random()-.5)*270,p.y+(Math.random()-.5)*210,34,.65+i*.09,e.damage,"#ff723c","burn",6);
+      if (pattern === 2) charge(e,p.x,p.y,enraged?480:410,.72,e.damage*1.45,"burn");
+      if (pattern === 3) { radial(e,12+bonus,190,6,e.damage*.72,"burn",game.zoneTime); for(let i=0;i<8;i++){const a=i/8*Math.PI*2;circle(e.x+Math.cos(a)*120,e.y+Math.sin(a)*120,30,.9,e.damage*.8,"#f05a31","burn",6);} }
     } else if (biome === 2) {
-      if (pattern === 0) { for(let i=0;i<10+bonus;i++){const a=i/(10+bonus)*Math.PI*2;addCircle(e.x+Math.cos(a)*125,e.y+Math.sin(a)*125,25,.8,e.damage,"#b9efff","slow",12);} addCircle(p.x,p.y,44,1.02,e.damage*1.1,"#e2f9ff","slow",12); }
-      if (pattern === 1) fireRadial(e,14+bonus,175,7,e.damage*.68,"slow",game.zoneTime);
-      if (pattern === 2) for(let i=-1-(enraged?1:0);i<=1+(enraged?1:0);i++){const a=aim+i*.28;addLine(e.x,e.y,e.x+Math.cos(a)*390,e.y+Math.sin(a)*390,24,.82,e.damage*1.15,"#aeeeff","slow",7);}
-      if (pattern === 3) { const a=Math.random()*Math.PI*2;e.x=p.x+Math.cos(a)*150;e.y=p.y+Math.sin(a)*150;burst(e.x,e.y,"#c8f4ff",18,150);for(let i=-2-bonus;i<=2+bonus;i++){const q=aim+Math.PI+i*.14;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(q),dy:Math.sin(q),speed:245,effect:7,damage:e.damage*.72,status:"slow",owner:e});} }
+      if (pattern === 0) { for(let i=0;i<10+bonus;i++){const a=i/(10+bonus)*Math.PI*2;circle(e.x+Math.cos(a)*125,e.y+Math.sin(a)*125,25,.8,e.damage,"#b9efff","slow",12);} circle(p.x,p.y,44,1.02,e.damage*1.1,"#e2f9ff","slow",12); }
+      if (pattern === 1) radial(e,14+bonus,175,7,e.damage*.68,"slow",game.zoneTime);
+      if (pattern === 2) for(let i=-1-(enraged?1:0);i<=1+(enraged?1:0);i++){const a=aim+i*.28;line(e.x,e.y,e.x+Math.cos(a)*390,e.y+Math.sin(a)*390,24,.82,e.damage*1.15,"#aeeeff","slow",7);}
+      if (pattern === 3) { const a=Math.random()*Math.PI*2;e.x=p.x+Math.cos(a)*150;e.y=p.y+Math.sin(a)*150;burst(e.x,e.y,"#c8f4ff",18,150);for(let i=-2-bonus;i<=2+bonus;i++){const q=aim+Math.PI+i*.14;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(q),dy:Math.sin(q),speed:245,effect:7,damage:e.damage*.72,status:"slow",owner:e,monsterFx:bossFx});} }
     } else if (biome === 3) {
-      if (pattern === 0) { addCircle(p.x,p.y,48,.68,e.damage*1.35,"#c89cff","stun",8);for(let i=0;i<7+bonus;i++)addCircle(p.x+(Math.random()-.5)*450,p.y+(Math.random()-.5)*330,32,.82+Math.random()*.3,e.damage*.85,"#a879ff","stun",8); }
-      if (pattern === 1) fireRadial(e,12+bonus,230,8,e.damage*.7,"stun",game.zoneTime);
-      if (pattern === 2) startCharge(e,p.x,p.y,enraged?560:470,.52,e.damage*1.3,"stun");
-      if (pattern === 3) { for(let i=-2;i<=2;i++)addLine(p.x-280,p.y+i*64,p.x+280,p.y+i*64,17,.78+i*.06,e.damage,"#b47aff","stun",8);for(let i=-2;i<=2;i++)addLine(p.x+i*64,p.y-240,p.x+i*64,p.y+240,17,1.02+i*.04,e.damage,"#8c63e7","stun",8); }
+      if (pattern === 0) { circle(p.x,p.y,48,.68,e.damage*1.35,"#c89cff","stun",8);for(let i=0;i<7+bonus;i++)circle(p.x+(Math.random()-.5)*450,p.y+(Math.random()-.5)*330,32,.82+Math.random()*.3,e.damage*.85,"#a879ff","stun",8); }
+      if (pattern === 1) radial(e,12+bonus,230,8,e.damage*.7,"stun",game.zoneTime);
+      if (pattern === 2) charge(e,p.x,p.y,enraged?560:470,.52,e.damage*1.3,"stun");
+      if (pattern === 3) { for(let i=-2;i<=2;i++)line(p.x-280,p.y+i*64,p.x+280,p.y+i*64,17,.78+i*.06,e.damage,"#b47aff","stun",8);for(let i=-2;i<=2;i++)line(p.x+i*64,p.y-240,p.x+i*64,p.y+240,17,1.02+i*.04,e.damage,"#8c63e7","stun",8); }
     } else {
-      if (pattern === 0) { fireRadial(e,14+bonus,205,9,e.damage*.7,"charm",game.zoneTime);for(let i=0;i<3;i++){const a=Math.random()*Math.PI*2;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(a),dy:Math.sin(a),speed:145,effect:9,damage:e.damage*.85,status:"charm",homing:.9,owner:e});} }
+      if (pattern === 0) { radial(e,14+bonus,205,9,e.damage*.7,"charm",game.zoneTime);for(let i=0;i<3;i++){const a=Math.random()*Math.PI*2;spawnProjectile({x:e.x,y:e.y,dx:Math.cos(a),dy:Math.sin(a),speed:145,effect:9,damage:e.damage*.85,status:"charm",homing:.9,owner:e,monsterFx:bossFx});} }
       if (pattern === 1 && game.enemies.filter(x=>!x.dead&&!x.boss).length<20) for(let i=0;i<(enraged?4:3);i++){const a=i/(enraged?4:3)*Math.PI*2;spawnEnemy(i%4,e.x+Math.cos(a)*90,e.y+Math.sin(a)*90,false);}
-      if (pattern === 2) for(let i=0;i<4+(enraged?2:0);i++){const a=game.zoneTime+i/(4+(enraged?2:0))*Math.PI;addLine(e.x-Math.cos(a)*330,e.y-Math.sin(a)*330,e.x+Math.cos(a)*330,e.y+Math.sin(a)*330,24,.88,e.damage*1.08,"#ee55b2","charm",9);}
-      if (pattern === 3) { addCircle(p.x,p.y,78,1.02,e.damage*1.45,"#ff5cae","charm",9);for(let i=0;i<8+bonus;i++){const a=i/(8+bonus)*Math.PI*2;addCircle(p.x+Math.cos(a)*128,p.y+Math.sin(a)*128,35,.78,e.damage*.8,"#8c57d5","charm",9);} }
+      if (pattern === 2) for(let i=0;i<4+(enraged?2:0);i++){const a=game.zoneTime+i/(4+(enraged?2:0))*Math.PI;line(e.x-Math.cos(a)*330,e.y-Math.sin(a)*330,e.x+Math.cos(a)*330,e.y+Math.sin(a)*330,24,.88,e.damage*1.08,"#ee55b2","charm",9);}
+      if (pattern === 3) { circle(p.x,p.y,78,1.02,e.damage*1.45,"#ff5cae","charm",9);for(let i=0;i<8+bonus;i++){const a=i/(8+bonus)*Math.PI*2;circle(p.x+Math.cos(a)*128,p.y+Math.sin(a)*128,35,.78,e.damage*.8,"#8c57d5","charm",9);} }
     }
     playBossSfx(biome,pattern);
   }
@@ -1133,8 +1264,23 @@
       else if(t.type==="cone"){const d=Math.hypot(p.x-t.x,p.y-t.y),a=Math.atan2(p.y-t.y,p.x-t.x);hit=d<t.range&&Math.abs(angleDelta(a,t.angle))<t.arc/2;}
       if(hit&&damagePlayer(t.damage,t.x,t.y))applyPlayerStatus(t.status,t.status==="stun"?.65:2.8);
       const ix=t.type==="line"?(t.x+t.x2)/2:t.x,iy=t.type==="line"?(t.y+t.y2)/2:t.y;
-      if(t.specialFx==="treantRoots")spawnTreantLineFx(t);else spawnImpact(ix,iy,t.effect||0,t.type==="line"?72:Math.max(46,(t.r||42)*1.25));
+      if(t.specialFx==="treantRoots")spawnTreantLineFx(t);
+      if(t.monsterFx)spawnTelegraphMonsterImpacts(t);
+      else if(t.specialFx!=="treantRoots")spawnImpact(ix,iy,t.effect||0,t.type==="line"?72:Math.max(46,(t.r||42)*1.25));
       burst(ix,iy,t.color,12,120);game.screenShake=Math.max(game.screenShake,t.specialFx==="treantRoots"?8:5);game.telegraphs.splice(i,1);
+    }
+  }
+
+  function spawnTelegraphMonsterImpacts(t) {
+    const fx=t.monsterFx;if(!fx)return;
+    if(t.type==="line"){
+      const length=Math.hypot(t.x2-t.x,t.y2-t.y),angle=Math.atan2(t.y2-t.y,t.x2-t.x),count=clamp(Math.ceil(length/96),3,8);
+      for(let i=0;i<count;i++){const q=(i+.5)/count;spawnMonsterFx(lerp(t.x,t.x2,q),lerp(t.y,t.y2,q),fx.col,fx.row,angle,Math.max(72,length/count*1.06),.46+i*.025);}
+    }else if(t.type==="cone"){
+      for(const q of [.28,.52,.78])spawnMonsterFx(t.x+Math.cos(t.angle)*t.range*q,t.y+Math.sin(t.angle)*t.range*q,fx.col,fx.row,t.angle,68+q*42,.46);
+    }else{
+      spawnMonsterFx(t.x,t.y,fx.col,fx.row,0,Math.max(82,t.r*1.55),.5);
+      if(t.r>46)for(let i=0;i<4;i++){const a=i*Math.PI/2;spawnMonsterFx(t.x+Math.cos(a)*t.r*.72,t.y+Math.sin(a)*t.r*.72,fx.col,fx.row,a,54,.4+i*.025);}
     }
   }
 
@@ -1166,19 +1312,25 @@
     if(e.state!=="charge")e.state="recover";e.stateTime=.28;e.attackCd=(a?.cooldown||1.4)*(1-Math.min(.2,game.depth*.025));e.pendingAttack=null;
   }
 
-  function updateEnemy(e,dt){if(e.dead)return;e.flash-=dt;e.hit-=dt;e.hurtFx-=dt;e.attackCd-=dt;e.specialCd-=dt;e.statusTick=(e.statusTick||0)-dt;e.statuses||={};Object.keys(e.statuses).forEach(k=>{e.statuses[k]-=dt;if(e.statuses[k]<=0)delete e.statuses[k];});if(e.statusTick<=0&&(e.statuses.burn||e.statuses.poison)){e.statusTick=.7;const dot=stats().attack*(e.statuses.burn?.12:.08);e.hp-=dot;numberFx(e.x,e.y-e.radius-8,`-${Math.ceil(dot)}`,e.statuses.burn?"#ff8a43":"#99db4d");spawnImpact(e.x,e.y,e.statuses.burn?11:13,34,.35);if(e.hp<=0){killEnemy(e);return;}}const p=game.player,dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy)||1;if(e.statuses.stun){e.vx*=Math.pow(.03,dt);e.vy*=Math.pow(.03,dt);return;}
+  function updateEnemy(e,dt){if(e.dead)return;e.flash-=dt;e.hit-=dt;e.hurtFx-=dt;e.launchFx=Math.max(0,(e.launchFx||0)-dt);e.attackCd-=dt;e.specialCd-=dt;e.statusTick=(e.statusTick||0)-dt;e.statuses||={};Object.keys(e.statuses).forEach(k=>{e.statuses[k]-=dt;if(e.statuses[k]<=0)delete e.statuses[k];});if(e.statusTick<=0&&(e.statuses.burn||e.statuses.poison)){e.statusTick=.7;const dot=stats().attack*(e.statuses.burn?.12:.08);e.hp-=dot;numberFx(e.x,e.y-e.radius-8,`-${Math.ceil(dot)}`,e.statuses.burn?"#ff8a43":"#99db4d");spawnImpact(e.x,e.y,e.statuses.burn?11:13,34,.35);if(e.hp<=0){killEnemy(e);return;}}const p=game.player,dx=p.x-e.x,dy=p.y-e.y,d=Math.hypot(dx,dy)||1;if(e.statuses.stun){e.vx*=Math.pow(.03,dt);e.vy*=Math.pow(.03,dt);return;}
     if(e.boss&&e.specialCd<=0&&e.state!=="charge"){bossSpecial(e);e.specialCd=Math.max(2.25,(5-game.biome*.28)*(e.hp<e.maxHp*.45?.72:1));if(e.state!=="charge"){e.state="special";e.stateTime=.55;}return;}
-    if(e.state==="charge"){e.stateTime-=dt;moveEntity(e,e.vx*dt,e.vy*dt,e.radius*.65);if(!e.chargeHit&&dist(e,p)<e.radius+p.radius+8){e.chargeHit=true;if(damagePlayer(e.chargeDamage,e.x,e.y))applyPlayerStatus(e.chargeStatus,e.chargeStatus==="stun"?.6:2.5);}if(e.stateTime<=0){e.state="recover";e.stateTime=.38;e.attackCd=e.boss?.8:(e.attack?.cooldown||1.5);}return;}
+    if(e.state==="charge"){
+      e.stateTime-=dt;moveEntity(e,e.vx*dt,e.vy*dt,e.radius*.65);emitBossMoveFx(e,dt);
+      e.chargeFxTick=(e.chargeFxTick||0)-dt;
+      if(e.chargeMonsterFx&&e.chargeFxTick<=0){e.chargeFxTick=.09;spawnMonsterFx(e.x,e.y,e.chargeMonsterFx.col,e.chargeMonsterFx.row,Math.atan2(e.vy,e.vx),e.boss?118:72,.28);}
+      if(!e.chargeHit&&dist(e,p)<e.radius+p.radius+8){e.chargeHit=true;if(damagePlayer(e.chargeDamage,e.x,e.y))applyPlayerStatus(e.chargeStatus,e.chargeStatus==="stun"?.6:2.5);if(e.chargeMonsterFx)spawnMonsterFx(p.x,p.y,e.chargeMonsterFx.col,e.chargeMonsterFx.row,Math.atan2(e.vy,e.vx),145,.48);}
+      if(e.stateTime<=0){if(e.chargeMonsterFx)spawnMonsterFx(e.x,e.y,e.chargeMonsterFx.col,e.chargeMonsterFx.row,Math.atan2(e.vy,e.vx),155,.5);e.chargeMonsterFx=null;e.state="recover";e.stateTime=.38;e.attackCd=e.boss?.8:(e.attack?.cooldown||1.5);}return;
+    }
     if(e.state==="hit"||e.state==="special"||e.state==="recover"){e.stateTime-=dt;moveEntity(e,e.vx*dt,e.vy*dt,e.radius*.65);e.vx*=Math.pow(.04,dt);e.vy*=Math.pow(.04,dt);if(e.stateTime<=0)e.state="chase";return;}
     if(e.state==="windup"){e.stateTime-=dt;e.vx*=.7;e.vy*=.7;if(e.stateTime<=0)performEnemyAttack(e);return;}
     const range=e.boss?e.radius+p.radius+28:e.attack.range;if(d<range&&e.attackCd<=0){e.state="windup";e.pendingAttack=e.boss?"bossMelee":e.attack.id;e.stateTime=e.boss?.42:e.attack.windup;e.targetX=p.x;e.targetY=p.y;e.vx=e.vy=0;return;}
-    if(d<(e.boss?430:Math.max(300,e.attack.range+40))){e.state="chase";const speed=e.speed*(game.biome===4&&game.altars.filter(a=>a.lit).length<2?1.12:1)*(e.statuses.slow?.58:1);const preferred=e.boss?55:(e.attack.range>180?e.attack.range*.72:32);if(d>preferred){e.vx=dx/d*speed;e.vy=dy/d*speed;moveEntity(e,e.vx*dt,e.vy*dt,e.radius*.7);}else{e.vx=e.vy=0;}}
-    else{e.state="patrol";e.phase+=dt;const tx=e.homeX+Math.cos(e.phase*.7)*45,ty=e.homeY+Math.sin(e.phase*.53)*45,pd=Math.hypot(tx-e.x,ty-e.y)||1;moveEntity(e,(tx-e.x)/pd*e.speed*.28*dt,(ty-e.y)/pd*e.speed*.28*dt,e.radius*.7);}
+    if(d<(e.boss?430:Math.max(300,e.attack.range+40))){e.state="chase";const speed=e.speed*(game.biome===4&&game.altars.filter(a=>a.lit).length<2?1.12:1)*(e.statuses.slow?.58:1);const preferred=e.boss?55:(e.attack.range>180?e.attack.range*.72:32);if(d>preferred){e.vx=dx/d*speed;e.vy=dy/d*speed;moveEntity(e,e.vx*dt,e.vy*dt,e.radius*.7);emitBossMoveFx(e,dt);}else{e.vx=e.vy=0;}}
+    else{e.state="patrol";e.phase+=dt;const tx=e.homeX+Math.cos(e.phase*.7)*45,ty=e.homeY+Math.sin(e.phase*.53)*45,pd=Math.hypot(tx-e.x,ty-e.y)||1;e.vx=(tx-e.x)/pd*e.speed*.28;e.vy=(ty-e.y)/pd*e.speed*.28;moveEntity(e,e.vx*dt,e.vy*dt,e.radius*.7);emitBossMoveFx(e,dt);}
   }
 
   function updatePlayer(dt) {
     const p = game.player; const st = stats();
-    p.invuln -= dt; p.attackCd -= dt; p.dash -= dt;p.activeCd1=Math.max(0,(p.activeCd1||0)-dt);p.activeCd2=Math.max(0,(p.activeCd2||0)-dt);p.recoveryPose=Math.max(0,(p.recoveryPose||0)-dt); p.hurtFx = Math.max(0,(p.hurtFx||0)-dt); p.statusTick = (p.statusTick||0)-dt;
+    p.invuln -= dt; p.attackCd -= dt; p.dash -= dt;p.weaponDrawn=Math.max(0,(p.weaponDrawn||0)-dt);p.activeCd1=Math.max(0,(p.activeCd1||0)-dt);p.activeCd2=Math.max(0,(p.activeCd2||0)-dt);p.recoveryPose=Math.max(0,(p.recoveryPose||0)-dt); p.hurtFx = Math.max(0,(p.hurtFx||0)-dt); p.statusTick = (p.statusTick||0)-dt;
     p.statuses ||= {};
     Object.keys(p.statuses).forEach(k=>{p.statuses[k]-=dt;if(p.statuses[k]<=0)delete p.statuses[k];});
     if(p.statusTick<=0&&(p.statuses.burn||p.statuses.poison)){p.statusTick=.65;const dot=p.statuses.burn?stats().maxHp*.025:stats().maxHp*.018;game.save.player.hp-=dot;numberFx(p.x,p.y-28,`-${Math.ceil(dot)}`,p.statuses.burn?"#ff8a43":"#99db4d");spawnImpact(p.x,p.y,p.statuses.burn?1:3,34,.35);if(game.save.player.hp<=0)die();}
@@ -1190,6 +1342,7 @@
     const len = Math.hypot(ix, iy) || 1; ix /= len; iy /= len;
     p.running=!!(p.runKey&&game.keys.has(p.runKey)&&performance.now()<p.runUntil);
     if ((ix || iy) && p.dash <= 0&&!p.swing) setPlayerAim(ix,iy);
+    if(game.scene==="expedition"&&!p.swing)updateAutoAim(false);
     if (p.dash <= 0) {
       const ice = game.biome === 2 && game.scene === "expedition";
       const grip = ice ? .07 : .28;
@@ -1202,26 +1355,31 @@
     if(game.scene==="camp"){p.x=clamp(p.x,28,W-28);p.y=clamp(p.y,185,H-42);}
     if (p.dash > 0 && Math.random() < .6) game.particles.push({ x: p.x, y: p.y, vx: -p.vx * .08, vy: -p.vy * .08, life: .25, max: .25, color: "#aee5ff", size: 6 });
     if (p.swing) {
-      p.swing.t -= dt; const swing = p.swing;
+      p.swing.t -= dt; const swing = p.swing,progress=clamp(1-swing.t/swing.max,0,1);
       if (swing.t < swing.max * .76 && swing.t > swing.max * .18) {
         if(swing.weaponType==="staff"&&!swing.fired){swing.fired=true;const mult=swing.combo===3?1.75:1,spread=swing.combo===3?[-.16,0,.16]:[0];spread.forEach(off=>{const a=Math.atan2(swing.dy,swing.dx)+off;spawnProjectile({x:p.x+swing.dx*18,y:p.y+swing.dy*18,dx:Math.cos(a),dy:Math.sin(a),speed:330,damage:st.attack*swing.profile.damage*mult,team:"player",effect:3,radius:11,pierce:swing.combo===3?2:0});});beep(520,.09,"sine",.03);}
-        const reach=swing.profile.reach+(swing.combo===3?(swing.weaponType==="sword"?34:swing.weaponType==="axe"?22:14):0),hitX=p.x+swing.dx*reach,hitY=p.y+swing.dy*reach;
-        game.enemies.forEach(e => {
-          if (e.dead || swing.hits.has(e) || swing.weaponType==="staff") return;
-          const radialFinisher=swing.combo===3&&["sword","axe"].includes(swing.weaponType),range=e.radius+swing.profile.width+(swing.combo===3?(swing.weaponType==="axe"?28:12):0)+(radialFinisher?reach*.65:0),distance=radialFinisher?dist(e,p):pointSegmentDistance(e.x,e.y,p.x,p.y,hitX,hitY);
-          if (distance < range) {
-            swing.hits.add(e); let mult = (swing.combo === 1 ? 1 : swing.combo === 2 ? 1.15 : 1.7)*swing.profile.damage;
-            if (swing.combo === 3 && game.save.skills.fury.finisher) mult *= 2;
-            if (Object.values(game.save.equipment.equipped).some(i => i && i.legendary?.id === "voidheart") && game.save.player.hp < st.maxHp * .3) mult *= 1.25;
-            const crit = Math.random() < st.critRate; let damage = st.attack * mult * offensiveMultiplier(e) * (crit ? st.critDamage : 1);
-            const knock = (swing.combo===3?swing.profile.knock*1.7:swing.profile.knock)*(game.save.skills.fury.finisher&&swing.combo===3?2:1);
-            damageEnemy(e, damage, crit, swing.dx * knock, swing.dy * knock);
-            rollOffensiveAffixes(e);
-            spawnImpact(e.x,e.y,WEAPON_TYPES.indexOf(swing.weaponType),swing.weaponType==="axe"?72:48);
-            const steal = st.lifeSteal + (Object.values(game.save.equipment.equipped).some(i => i && i.legendary?.id === "bloodblade") ? .05 : 0);
-            if (steal > 0) game.save.player.hp = Math.min(st.maxHp, game.save.player.hp + damage * steal);
-          }
-        });
+        if(swing.weaponType==="sword"&&swing.combo===3&&!swing.fired){swing.fired=true;spawnProjectile({x:p.x+swing.dx*24,y:p.y+swing.dy*24,dx:swing.dx,dy:swing.dy,speed:405,damage:st.attack*1.8,team:"player",effect:0,radius:18,life:1.15,pierce:3,playerFx:"swordWave"});burst(p.x+swing.dx*30,p.y+swing.dy*30,"#bfefff",13,155);}
+        if(swing.weaponType==="daggers"&&swing.combo===3){const thresholds=[.24,.5,.73];while(swing.daggerStage<3&&progress>=thresholds[swing.daggerStage]){const stage=swing.daggerStage++,stageHits=swing.daggerHits[stage],reach=swing.profile.reach+18+stage*5,hitX=p.x+swing.dx*reach,hitY=p.y+swing.dy*reach;moveEntity(p,swing.dx*7,swing.dy*7,p.radius);game.enemies.forEach(e=>{if(e.dead||stageHits.has(e)||pointSegmentDistance(e.x,e.y,p.x,p.y,hitX,hitY)>=e.radius+swing.profile.width+8)return;stageHits.add(e);let mult=[.62,.68,.92][stage]*swing.profile.damage;if(game.save.skills.fury.finisher)mult*=1.22;const crit=Math.random()<st.critRate,damage=st.attack*mult*offensiveMultiplier(e)*(crit?st.critDamage:1);damageEnemy(e,damage,crit,swing.dx*(70+stage*30),swing.dy*(70+stage*30));rollOffensiveAffixes(e);spawnImpact(e.x,e.y,4,44+stage*9,.22);});burst(p.x+swing.dx*reach,p.y+swing.dy*reach,stage===2?"#efb4ff":"#d6e9ff",7+stage*3,105+stage*20);}}
+        if(!["staff"].includes(swing.weaponType)&&!(swing.weaponType==="sword"&&swing.combo===3)&&!(swing.weaponType==="daggers"&&swing.combo===3)){
+          const reach=swing.profile.reach+(swing.combo===3?(swing.weaponType==="axe"?22:14):0),hitX=p.x+swing.dx*reach,hitY=p.y+swing.dy*reach;
+          game.enemies.forEach(e => {
+            if (e.dead || swing.hits.has(e)) return;
+            const radialFinisher=swing.combo===3&&swing.weaponType==="axe",range=e.radius+swing.profile.width+(swing.combo===3?(swing.weaponType==="axe"?28:12):0)+(radialFinisher?reach*.65:0),distance=radialFinisher?dist(e,p):pointSegmentDistance(e.x,e.y,p.x,p.y,hitX,hitY);
+            if (distance < range) {
+              swing.hits.add(e); let mult = (swing.combo === 1 ? 1 : swing.combo === 2 ? 1.15 : 1.7)*swing.profile.damage;
+              if (swing.combo === 3 && game.save.skills.fury.finisher) mult *= 2;
+              if (Object.values(game.save.equipment.equipped).some(i => i && i.legendary?.id === "voidheart") && game.save.player.hp < st.maxHp * .3) mult *= 1.25;
+              const crit = Math.random() < st.critRate; let damage = st.attack * mult * offensiveMultiplier(e) * (crit ? st.critDamage : 1);
+              const knock = (swing.combo===3?swing.profile.knock*1.7:swing.profile.knock)*(game.save.skills.fury.finisher&&swing.combo===3?2:1);
+              damageEnemy(e, damage, crit, swing.dx * knock, swing.dy * knock);
+              if(swing.weaponType==="spear"&&swing.combo===2){e.launchFx=.42;applyEnemyStatus(e,"stun",.36);}
+              rollOffensiveAffixes(e);
+              spawnImpact(e.x,e.y,WEAPON_TYPES.indexOf(swing.weaponType),swing.weaponType==="axe"?72:48);
+              const steal = st.lifeSteal + (Object.values(game.save.equipment.equipped).some(i => i && i.legendary?.id === "bloodblade") ? .05 : 0);
+              if (steal > 0) game.save.player.hp = Math.min(st.maxHp, game.save.player.hp + damage * steal);
+            }
+          });
+        }
       }
       if (swing.t <= 0) {if(swing.combo===3)p.recoveryPose=.34;p.swing = null;}
     }
@@ -1243,7 +1401,7 @@
 
   function updateEffects(dt) {
     for (let i = game.particles.length - 1; i >= 0; i--) {
-      const p = game.particles[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(.08, dt); p.vy *= Math.pow(.08, dt);
+      const p = game.particles[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rotation=(p.rotation||0)+(p.spin||0)*dt;p.vx *= Math.pow(.08, dt); p.vy *= Math.pow(.08, dt);
       if (p.life <= 0) game.particles.splice(i, 1);
     }
     for (let i = game.numbers.length - 1; i >= 0; i--) {
@@ -1303,13 +1461,11 @@
   function drawCamp(time) {
     const grad=ctx.createLinearGradient(0,0,0,H);grad.addColorStop(0,"#141b2b");grad.addColorStop(1,"#1b211f");ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
     for(let y=0;y<H;y+=TILE)for(let x=0;x<W;x+=TILE){if(!drawAtlasCell(ART.terrain,0,0,5,2,x+TILE/2,y+TILE/2,TILE,TILE)){ctx.fillStyle="#28322b";ctx.fillRect(x,y,TILE,TILE);}}
-    ctx.fillStyle="rgba(8,10,17,.74)";ctx.fillRect(0,0,W,165);
-    for (let i = 0; i < 5; i++) {
-      const px=170+i*235,unlocked=game.save.progress.unlocked.includes(i),img=ART[BIOME_ART_KEYS[i]],pulse=1+Math.sin(time*2+i)*.035;drawAtlasCell(img,2,1,5,2,px,102,112*pulse,112*pulse,{alpha:unlocked?1:.28,filter:unlocked?"none":"grayscale(1)"});
-    }
     drawAtlasCell(ART.waste,4,1,5,2,205,492,150+Math.sin(time*5)*3,150+Math.sin(time*5)*3);drawAtlasCell(ART.forest,4,1,5,2,1050,492,145,145,{alpha:.9});
+    for(let i=0;i<9;i++){const x=145+i*137,y=170+(i%3)*34;ctx.save();ctx.globalAlpha=.18+.12*Math.sin(time*2+i);ctx.fillStyle=i%2?"#ffd56d":"#9ee8c1";ctx.fillRect(x,y,3,3);ctx.restore();}
     drawPlayer(game.player, time);
-    ctx.fillStyle = "#fff1bf"; ctx.font = "700 14px Microsoft YaHei"; ctx.textAlign = "center"; ctx.fillText("星门 [M]", W / 2, 188); ctx.fillText("元素铁匠铺 [B]", 205, 390); ctx.textAlign = "left";
+    ctx.fillStyle = "#fff1bf"; ctx.font = "700 14px Microsoft YaHei"; ctx.textAlign = "center"; ctx.fillText("元素铁匠铺 [B]", 205, 390); ctx.textAlign = "left";
+    if(Math.hypot(game.player.x-205,game.player.y-492)<145)drawWorldHint(205,580,"E · 打开元素锻炉","#ffd978");
   }
 
   function drawTile(tx, ty, tile, b, time) {
@@ -1329,9 +1485,40 @@
     const pulse=1+Math.sin(time*4+a.x)*.045;drawBiomeObject(4,a.x,a.y-10,76*pulse,{alpha:a.lit?1:.55,filter:a.lit?"none":"grayscale(.7)"});if(a.lit){ctx.save();ctx.globalAlpha=.22+.1*Math.sin(time*5);ctx.fillStyle=BIOMES[game.biome].accent;ctx.beginPath();ctx.arc(a.x,a.y-15,48,0,Math.PI*2);ctx.fill();ctx.restore();}
   }
 
+  function drawWorldHint(x,y,text,color="#fff1b3"){
+    ctx.save();ctx.font="900 11px Microsoft YaHei";ctx.textAlign="center";ctx.textBaseline="middle";ctx.lineWidth=4;ctx.lineJoin="round";ctx.strokeStyle="rgba(4,5,9,.9)";ctx.strokeText(text,Math.round(x),Math.round(y));ctx.fillStyle=color;ctx.shadowColor=color;ctx.shadowBlur=5;ctx.fillText(text,Math.round(x),Math.round(y));ctx.restore();
+  }
+
+  function drawWorldInteractionLabels(){
+    const p=game.player,b=BIOMES[game.biome];
+    const placed=[];
+    game.groundDrops.filter(d=>dist(d,p)<135).sort((a,c)=>a.y-c.y||a.x-c.x).forEach(d=>{
+      let labelY=d.y-(d.kind==="equipment"?49:43);
+      while(placed.some(label=>Math.abs(label.x-d.x)<118&&Math.abs(label.y-labelY)<15))labelY-=15;
+      placed.push({x:d.x,y:labelY});
+      if(d.kind==="equipment"){const q=qualityById(d.item.quality);drawWorldHint(d.x,labelY,`${q.name} ${d.item.name}`,q.color);}
+      else if(d.kind==="potion")drawWorldHint(d.x,labelY,"生命药水","#79ef91");
+      else{const isCore=d.material===b.core,isRare=d.material===b.rare,color=isCore?"#ffe06e":isRare?"#d78dff":d.material===b.ore?"#9ccfff":b.accent;drawWorldHint(d.x,labelY,`${MATERIAL_NAMES[d.material]} ×${d.amount||1}`,color);}
+    });
+    const altar=game.altars.find(a=>!a.lit&&dist(a,p)<80);if(altar)drawWorldHint(altar.x,altar.y-62,"E · 点燃祭坛","#ff92e1");
+    if(game.world?.exit){const ex=(game.world.exit.x+.5)*TILE,ey=(game.world.exit.y+.5)*TILE;if(Math.hypot(ex-p.x,ey-p.y)<95)drawWorldHint(ex,ey-58,game.depth<5?"E · 前往下一深度":"E · 返回星火营地",b.accent);}
+  }
+
+  function drawBossFootFx(e,time){
+    const pulse=.5+.5*Math.sin(time*5+e.phase);ctx.save();ctx.translate(Math.round(e.x),Math.round(e.y+e.radius*.55));ctx.globalAlpha=.34+pulse*.16;ctx.lineWidth=2;
+    if(game.biome===0){ctx.strokeStyle="#84d66c";for(let i=0;i<4;i++){const a=i*Math.PI/2+time*.08;ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(Math.cos(a+.7)*34,Math.sin(a+.7)*14,Math.cos(a)*58,Math.sin(a)*22);ctx.stroke();}}
+    else if(game.biome===1){const g=ctx.createRadialGradient(0,0,2,0,0,58);g.addColorStop(0,"rgba(255,210,80,.55)");g.addColorStop(.45,"rgba(255,82,35,.28)");g.addColorStop(1,"rgba(255,40,20,0)");ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(0,0,58,23,0,0,Math.PI*2);ctx.fill();}
+    else if(game.biome===2){ctx.strokeStyle="#d8f8ff";for(let i=0;i<7;i++){const a=i/7*Math.PI*2;ctx.beginPath();ctx.moveTo(Math.cos(a)*28,Math.sin(a)*11);ctx.lineTo(Math.cos(a)*54,Math.sin(a)*21);ctx.lineTo(Math.cos(a+.16)*43,Math.sin(a+.16)*17);ctx.stroke();}}
+    else if(game.biome===3){ctx.strokeStyle="#c89cff";for(let i=0;i<5;i++){const a=i/5*Math.PI*2+time*.3,r=32+i%2*12;ctx.beginPath();ctx.moveTo(Math.cos(a)*12,Math.sin(a)*5);ctx.lineTo(Math.cos(a+.13)*r*.55,Math.sin(a+.13)*r*.25);ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r*.42);ctx.stroke();}}
+    else{ctx.strokeStyle="#f25bb7";ctx.beginPath();ctx.ellipse(0,0,44+pulse*8,17+pulse*3,0,0,Math.PI*2);ctx.stroke();ctx.globalAlpha*=.65;ctx.beginPath();ctx.ellipse(0,0,27-pulse*4,9-pulse,0,0,Math.PI*2);ctx.stroke();}
+    ctx.restore();
+  }
+
   function drawEnemy(e, time) {
-    if(e.dead)return;const flying=(game.biome===2&&e.typeIndex===0)||(game.biome===3&&[0,2,3].includes(e.typeIndex))||(game.biome===4&&[0,2,3].includes(e.typeIndex)),slime=game.biome===0&&e.typeIndex===0,bob=flying?Math.sin(time*4+e.phase)*6:Math.sin(time*2.4+e.phase)*1.8;let sx=1,sy=1,rot=0;if(slime){sx=1+Math.sin(time*5+e.phase)*.08;sy=1-Math.sin(time*5+e.phase)*.07;}if(e.state==="windup"){sx*=.9+Math.sin(time*18)*.04;sy*=1.08;}if(e.state==="charge")rot=Math.atan2(e.vy,e.vx)*.08;
-    const size=e.boss?132:(e.elite?78:66),img=ART[BIOME_ART_KEYS[game.biome]];if(e.elite)drawAtlasCell(ART.eliteLoot,game.biome,0,5,2,e.x,e.y+e.radius*.58,92+Math.sin(time*5)*4,48,{alpha:.82});ctx.save();ctx.translate(e.x,e.y+bob);ctx.scale(sx,sy);drawAtlasCell(img,e.boss?4:e.typeIndex,0,5,2,0,-size*.08,size,size,{flip:e.vx<-.5,rotation:rot,filter:e.flash>0?"brightness(3) saturate(0)":"none"});ctx.restore();
+    if(e.dead)return;const flying=(game.biome===2&&e.typeIndex===0)||(game.biome===3&&[0,2,3].includes(e.typeIndex))||(game.biome===4&&[0,2,3].includes(e.typeIndex)),slime=game.biome===0&&e.typeIndex===0,launch=(e.launchFx||0)>0?Math.sin(clamp(e.launchFx/.42,0,1)*Math.PI)*24:0,bob=(flying?Math.sin(time*4+e.phase)*6:Math.sin(time*2.4+e.phase)*1.8)-launch;let sx=1,sy=1,rot=0;if(slime){sx=1+Math.sin(time*5+e.phase)*.08;sy=1-Math.sin(time*5+e.phase)*.07;}if(e.state==="windup"){sx*=.9+Math.sin(time*18)*.04;sy*=1.08;}if(e.state==="charge")rot=Math.atan2(e.vy,e.vx)*.08;
+    const size=e.boss?132:(e.elite?78:66),img=ART[BIOME_ART_KEYS[game.biome]];if(e.boss)drawBossFootFx(e,time);
+    if(e.boss&&e.activeBossFx&&(e.state==="special"||e.state==="charge"))drawMonsterEffect(e.activeBossFx.col,e.activeBossFx.row,e.x,e.y-8,168+Math.sin(time*14)*16,{rotation:time*.45,alpha:.42});
+    if(e.elite)drawAtlasCell(ART.eliteLoot,game.biome,0,5,2,e.x,e.y+e.radius*.58,92+Math.sin(time*5)*4,48,{alpha:.82});ctx.save();ctx.translate(e.x,e.y+bob);ctx.scale(sx,sy);drawAtlasCell(img,e.boss?4:e.typeIndex,0,5,2,0,-size*.08,size,size,{flip:e.vx<-.5,rotation:rot,filter:e.flash>0?"brightness(3) saturate(0)":"none"});ctx.restore();
     if(e.state==="windup"){ctx.fillStyle="#ffdfb0";ctx.font="900 10px Microsoft YaHei";ctx.textAlign="center";ctx.fillText(e.boss?"重击":e.attack.name,e.x,e.y-size*.58-8);ctx.textAlign="left";}if(!e.boss&&e.hp<e.maxHp){ctx.fillStyle="#1a1015";ctx.fillRect(e.x-20,e.y-size*.48,40,5);ctx.fillStyle=e.elite?"#ffd15c":"#e45a55";ctx.fillRect(e.x-20,e.y-size*.48,40*Math.max(0,e.hp/e.maxHp),5);}Object.keys(e.statuses||{}).forEach((s,i)=>drawEffect({burn:11,slow:12,poison:13,stun:14}[s]??10,e.x-13+i*13,e.y-size*.58-19,24,{alpha:.9}));
   }
 
@@ -1344,38 +1531,44 @@
     const angle = Number.isFinite(p.aimAngle) ? p.aimAngle : Math.atan2(p.dirY, p.dirX);
     const ax = Math.cos(angle), ay = Math.sin(angle);
     const col = Math.abs(ax) >= Math.abs(ay) ? (ax >= 0 ? 0 : 2) : (ay >= 0 ? 1 : 3);
-    const speed=Math.hypot(p.vx,p.vy),moving=speed>12,running=Boolean(p.running&&moving),hurt=Boolean(p.hurtFx>.11),attack=Boolean(p.swing);
+    const speed=Math.hypot(p.vx,p.vy),moving=speed>12,running=Boolean(p.running&&moving),hurt=Boolean(p.hurtFx>.11),attack=Boolean(p.swing||p.weaponDrawn>0);
     const walkFrame=Math.floor(time*7)%2,runFrame=Math.floor(time*12)%4,attackProgress=p.swing?clamp(1-p.swing.t/p.swing.max,0,1):0;
     const directionalRow=attack?2+Math.min(2,Math.floor(attackProgress*3)):hurt?4:0;
     const sheet=running?ART.heroBaseRun:moving&&!attack&&!hurt?ART.heroBaseWalk:ART.heroBase;
     const rows=running?4:moving&&!attack&&!hurt?2:5,frameRow=running?runFrame:moving&&!attack&&!hurt?walkFrame:directionalRow;
     const flashFilter=p.hurtFx>0?"brightness(1.6) saturate(.65)":"none";
+    const equipped=game.save.equipment.equipped,themeFilter=region=>["none","hue-rotate(235deg) saturate(1.45) brightness(1.05)","hue-rotate(75deg) saturate(.75) brightness(1.35)","hue-rotate(120deg) saturate(1.1) brightness(1.15)","hue-rotate(170deg) saturate(.9) brightness(.72) contrast(1.15)"][clamp(region??0,0,4)];
+    const weaponType=equipped.weapon?weaponTypeOf(equipped.weapon):null,weaponCol=Math.max(0,WEAPON_TYPES.indexOf(weaponType)),weaponOrigin={sword:[.33,.58],spear:[.31,.63],axe:[.27,.59],staff:[.16,.60],daggers:[.34,.54]}[weaponType],weaponSize=weaponType==="spear"?60:weaponType==="daggers"?48:weaponType==="staff"?58:56;
+    if(equipped.weapon&&!attack){const backSocket=[{x:-10,y:-29},{x:0,y:-29},{x:10,y:-29},{x:0,y:-30}][col];drawAtlasSubCell(ART.wearableEquipment,weaponCol,2,5,3,[0,0,1,1],p.x+backSocket.x,p.y+backSocket.y,weaponSize,weaponSize,{rotation:0,filter:flashFilter,originX:weaponOrigin[0],originY:weaponOrigin[1]});}
     drawAtlasCell(sheet,col,frameRow,4,rows,p.x,p.y-22,82,102,{filter:flashFilter});
 
-    const equipped=game.save.equipment.equipped,themeFilter=region=>["none","hue-rotate(235deg) saturate(1.45) brightness(1.05)","hue-rotate(75deg) saturate(.75) brightness(1.35)","hue-rotate(120deg) saturate(1.1) brightness(1.15)","hue-rotate(170deg) saturate(.9) brightness(.72) contrast(1.15)"][clamp(region??0,0,4)];
     const armorSheet=running?ART.armorRun:moving&&!attack&&!hurt?ART.armorWalk:ART.armorDirectional;
     if(equipped.armor)drawAtlasSubCell(armorSheet,col,frameRow,4,rows,[0,0,1,.72],p.x,p.y-22,82,73,{originY:.7,filter:themeFilter(equipped.armor.region)});
     if(equipped.boots)drawAtlasSubCell(armorSheet,col,frameRow,4,rows,[0,.72,1,.28],p.x,p.y+14,82,29,{filter:themeFilter(equipped.boots.region)});
-    if(equipped.helmet)drawAtlasCell(ART.wearableEquipment,clamp(equipped.helmet.region??0,0,4),0,5,3,p.x,p.y-48,36,36,{filter:flashFilter});
+    if(SHOW_WORN_HELMETS&&equipped.helmet){const socket=[{x:12,y:-38},{x:6,y:-38},{x:-6,y:-38},{x:-8,y:-38}][col];drawAtlasCell(ART.helmetDirectional,clamp(equipped.helmet.region??0,0,4),col,5,4,p.x+socket.x,p.y+socket.y,48,48,{filter:flashFilter});}
     if(equipped.amulet){ctx.save();ctx.globalAlpha=.24+.06*Math.sin(time*5);ctx.strokeStyle=BIOMES[equipped.amulet.region||0].accent;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y-22,30+Math.sin(time*4)*2,0,Math.PI*2);ctx.stroke();ctx.restore();}
-    if(equipped.weapon){const type=weaponTypeOf(equipped.weapon),weaponCol=Math.max(0,WEAPON_TYPES.indexOf(type)),swingDirection=p.swing?.combo===2?-1:1,swingArc=p.swing?swingDirection*lerp(-.68,.58,attackProgress):0,weaponAngle=angle+swingArc,handX=p.x+Math.cos(weaponAngle)*24,handY=p.y-23+Math.sin(weaponAngle)*24;drawAtlasCell(ART.wearableEquipment,weaponCol,2,5,3,handX,handY,type==="spear"?60:56,type==="spear"?60:56,{rotation:weaponAngle+Math.PI/4,filter:flashFilter});}
+    if(equipped.weapon&&attack){const swingArc=p.swing?weaponSwingArc(weaponType,p.swing.combo,attackProgress):0,weaponAngle=angle+swingArc,socket=[{x:15,y:-23},{x:9,y:-19},{x:-15,y:-23},{x:7,y:-27}][col];drawAtlasSubCell(ART.wearableEquipment,weaponCol,2,5,3,[0,0,1,1],p.x+socket.x,p.y+socket.y,weaponSize,weaponSize,{rotation:weaponAngle+Math.PI/4,filter:flashFilter,originX:weaponOrigin[0],originY:weaponOrigin[1]});}
+  }
+
+  function drawComboAttackEffect(type,combo,progress,hand,weaponAngle){const alpha=Math.max(.08,Math.sin(progress*Math.PI)),aim=game.player.swing?Math.atan2(game.player.swing.dy,game.player.swing.dx):weaponAngle,ax=Math.cos(aim),ay=Math.sin(aim),px=-ay,py=ax,at=(distance)=>({x:Math.round(hand.x+ax*distance),y:Math.round(hand.y+ay*distance)}),stroke=(x1,y1,x2,y2,color,width)=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(Math.round(x1),Math.round(y1));ctx.lineTo(Math.round(x2),Math.round(y2));ctx.stroke();};ctx.save();ctx.globalAlpha*=alpha;ctx.lineCap="round";ctx.lineJoin="round";ctx.shadowBlur=9;
+    if(type==="sword"){const point=at(combo===3?54:34),color=combo===1?"#dff5ff":combo===2?"#ffe5a0":"#bdeeff";ctx.shadowColor=color;if(combo===3){drawSwordWave(point.x,point.y,108+progress*24,{rotation:aim,alpha:.88});stroke(hand.x+px*18,hand.y+py*18,point.x+px*22,point.y+py*22,color,3);}else{drawEffect(combo-1,point.x,point.y,68+combo*10,{rotation:weaponAngle,alpha:.72});ctx.beginPath();ctx.arc(hand.x,hand.y,35+combo*5,aim+(combo===1?-1.05:.12),aim+(combo===1?.62:-.8),combo===2);ctx.strokeStyle=color;ctx.lineWidth=4;ctx.stroke();}}
+    else if(type==="spear"){const point=at(combo===3?72:50),color=combo===2?"#8edfff":"#fff0bd";ctx.shadowColor=color;stroke(hand.x,hand.y,point.x,point.y,color,combo===3?6:3);stroke(hand.x+px*5,hand.y+py*5,point.x+px*(combo===2?22:7),point.y+py*(combo===2?22:7),"#87bfff",2);drawEffect(combo===2?7:1,point.x,point.y,combo===3?96:62,{rotation:aim+Math.PI/4,alpha:.72});}
+    else if(type==="axe"){const point=at(42),color="#d9ecf2";ctx.shadowColor=color;if(combo===3){const cx=Math.round(game.player.x),cy=Math.round(game.player.y-22),spin=axeSpinAngle(progress),radius=54+Math.sin(progress*Math.PI)*13,trailStart=spin-1.12;ctx.globalAlpha*=.9;ctx.strokeStyle="#d9ecf2";ctx.lineWidth=6;ctx.beginPath();ctx.arc(cx,cy,radius,trailStart,spin+.18);ctx.stroke();ctx.strokeStyle="#7894a4";ctx.lineWidth=3;ctx.beginPath();ctx.arc(cx,cy,radius-10,trailStart-.22,spin-.08);ctx.stroke();ctx.strokeStyle="#f3fbff";ctx.lineWidth=2;ctx.setLineDash([10,7]);ctx.lineDashOffset=-progress*42;ctx.beginPath();ctx.arc(cx,cy,radius+8,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);for(let i=0;i<6;i++){const a=spin-i*.2,r=radius+10-i*2;stroke(cx+Math.cos(a)*r,cy+Math.sin(a)*r*.56,cx+Math.cos(a)*(r+14),cy+Math.sin(a)*(r+14)*.56,i%2?"#8aa2ad":"#e9f6f7",2);}ctx.fillStyle="#8b7154";ctx.globalAlpha*=.48;for(let i=0;i<7;i++){const a=i/7*Math.PI*2+spin*.22,r=30+(i%3)*11;ctx.fillRect(Math.round(cx+Math.cos(a)*r)-2,Math.round(game.player.y+8+Math.sin(a)*5)-2,4+(i%2)*2,3);}}else{ctx.shadowColor=color;drawEffect(2,point.x,point.y,82+combo*10,{rotation:weaponAngle,alpha:.7});ctx.strokeStyle=color;ctx.lineWidth=4;ctx.beginPath();ctx.arc(game.player.x,game.player.y-12,44,aim-.9,aim+.72);ctx.stroke();}}
+    else if(type==="staff"){const point=at(43),color=combo===1?"#a9ddff":combo===2?"#bca9ff":"#f3b8ff";ctx.shadowColor=color;drawEffect(3,point.x,point.y,58+combo*18,{rotation:weaponAngle+Math.PI/4,alpha:.82});ctx.strokeStyle=color;ctx.lineWidth=2;for(let i=0;i<combo;i++){const a=progress*5+i*Math.PI*2/combo;ctx.beginPath();ctx.arc(point.x+Math.cos(a)*(18+combo*3),point.y+Math.sin(a)*(18+combo*3),3+i,0,Math.PI*2);ctx.stroke();}}
+    else{const point=at(29),color=combo===3?"#efb9ff":"#dbe5ff";ctx.shadowColor=color;drawEffect(4,point.x,point.y,56+combo*12,{rotation:weaponAngle+2.5,alpha:.72});const strikes=combo===3?3:combo;for(let i=0;i<strikes;i++){const off=(i-(strikes-1)/2)*12,reach=31+i*7;stroke(hand.x+px*off,hand.y+py*off,hand.x+ax*reach+px*(off+8),hand.y+ay*reach+py*(off+8),color,3);}}
+    ctx.restore();
   }
 
   function drawLayeredPlayer(p, time) {
     const character = syncLayeredPlayerVisual(0), renderer = game.equipmentSystem.renderer;
     renderer.render(ctx, character);
     if (p.swing) {
-      const type = equippedWeaponType(), weaponAngle = character.pose.weaponAngle;
+      const type = equippedWeaponType(), weaponAngle = character.pose.weaponAngle + Number(character.pose.worldRotation || 0);
       const wax = Math.cos(weaponAngle), way = Math.sin(weaponAngle);
       const hand = renderer.getWorldAnchor(character, "rightHandAnchor");
-      const effectSize = (type === "axe" ? 105 : type === "spear" ? 82 : type === "staff" ? 72 : 76) + (p.swing.combo === 3 ? 18 : 0);
-      // The weapon sprite origin is its grip, so the blade and attack effect
-      // share this exact animated right-hand socket for every aim angle.
-      const effectDistance = { sword:31, spear:43, axe:38, staff:39, daggers:25 }[type] || 31;
-      const effectX = Math.round(hand.x + wax * effectDistance), effectY = Math.round(hand.y + way * effectDistance);
-      const offset = { spear:Math.PI/4, axe:0, staff:Math.PI/4, daggers:2.5 }[type] || 0;
-      if (type === "sword") drawSwordWave(effectX, effectY, effectSize, { rotation:weaponAngle, alpha:.82 });
-      else drawEffect(WEAPON_TYPES.indexOf(type), effectX, effectY, effectSize, { rotation:weaponAngle + offset, alpha:.78 });
+      // Every combo effect uses the same frame-level hand socket as the
+      // weapon grip; effects therefore cannot drift away from the hand.
+      drawComboAttackEffect(type,p.swing.combo,character.pose.attackProgress,hand,weaponAngle);
     }
     Object.keys(p.statuses || {}).forEach((status, index) => {
       const effectIndex = { burn:11, slow:12, poison:13, stun:14, charm:9 }[status];
@@ -1383,9 +1576,57 @@
     });
   }
 
-  function drawTelegraph(t){const pct=1-t.life/t.max;ctx.save();ctx.globalAlpha=.16+pct*.48;ctx.fillStyle=t.color;ctx.strokeStyle=t.color;ctx.lineWidth=3;if(t.type==="circle"){ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=.8;ctx.beginPath();ctx.arc(t.x,t.y,t.r*(.2+pct*.8),0,Math.PI*2);ctx.stroke();}else if(t.type==="line"){ctx.lineWidth=t.width*2;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();ctx.globalAlpha=.9;ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();if(t.specialFx==="treantRoots"){ctx.setLineDash([]);const angle=Math.atan2(t.y2-t.y,t.x2-t.x),length=Math.hypot(t.x2-t.x,t.y2-t.y),segments=Math.max(3,Math.ceil(length/88)),frame=Math.min(3,Math.floor(pct*4));for(let i=0;i<segments;i++){const q=(i+.5)/segments;drawTreantEffect(frame,lerp(t.x,t.x2,q),lerp(t.y,t.y2,q),length/segments*1.15,45+pct*14,{rotation:angle,alpha:.38+pct*.44});}}}else{ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.arc(t.x,t.y,t.range,t.angle-t.arc/2,t.angle+t.arc/2);ctx.closePath();ctx.fill();}ctx.restore();}
-  function drawProjectile(q){const a=Math.atan2(q.vy,q.vx);if(q.monsterFx)drawMonsterEffect(q.monsterFx.col,q.monsterFx.row,q.x,q.y,q.radius*5.6,{rotation:a,alpha:.96});else drawEffect(q.effect,q.x,q.y,q.radius*3.8,{rotation:a+(q.team==="player"&&q.effect===3?Math.PI/4:0),alpha:.96});}
+  function drawTelegraph(t){
+    const pct=clamp(1-t.life/t.max,0,1),pulse=.86+Math.sin(performance.now()*.012)*.14;
+    ctx.save();ctx.fillStyle=t.color;ctx.strokeStyle=t.color;ctx.shadowColor=t.color;ctx.shadowBlur=8;ctx.lineCap="round";ctx.lineJoin="round";
+    if(t.type==="circle"){
+      ctx.globalAlpha=.045+pct*.07;ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=.38+pct*.48;ctx.lineWidth=2;ctx.setLineDash([8,6]);ctx.lineDashOffset=-pct*36;ctx.beginPath();ctx.arc(t.x,t.y,t.r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+      ctx.globalAlpha=.72;ctx.lineWidth=2;ctx.beginPath();ctx.arc(t.x,t.y,t.r*(.18+pct*.78),0,Math.PI*2);ctx.stroke();
+      for(let i=0;i<8;i++){const a=i/8*Math.PI*2+pct*.55;ctx.globalAlpha=.45+pct*.35;ctx.beginPath();ctx.moveTo(t.x+Math.cos(a)*t.r*.84,t.y+Math.sin(a)*t.r*.84);ctx.lineTo(t.x+Math.cos(a)*t.r*1.08,t.y+Math.sin(a)*t.r*1.08);ctx.stroke();}
+    }else if(t.type==="line"){
+      const dx=t.x2-t.x,dy=t.y2-t.y,length=Math.hypot(dx,dy)||1,ux=dx/length,uy=dy/length,nx=-uy,ny=ux,half=t.width*.62;
+      ctx.globalAlpha=.055+pct*.07;ctx.lineWidth=Math.max(4,t.width*1.15);ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();
+      ctx.globalAlpha=.52+pct*.35;ctx.lineWidth=2;for(const side of [-1,1]){ctx.beginPath();ctx.moveTo(t.x+nx*half*side,t.y+ny*half*side);ctx.lineTo(t.x2+nx*half*side,t.y2+ny*half*side);ctx.stroke();}
+      ctx.globalAlpha=.78;ctx.setLineDash([10,9]);ctx.lineDashOffset=-pct*44;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x2,t.y2);ctx.stroke();ctx.setLineDash([]);
+      const chevrons=clamp(Math.floor(length/78),3,8);for(let i=1;i<=chevrons;i++){const q=i/(chevrons+1),cx=lerp(t.x,t.x2,q),cy=lerp(t.y,t.y2,q),back=8;ctx.globalAlpha=.48+pct*.38;ctx.beginPath();ctx.moveTo(cx-ux*back+nx*7,cy-uy*back+ny*7);ctx.lineTo(cx,cy);ctx.lineTo(cx-ux*back-nx*7,cy-uy*back-ny*7);ctx.stroke();}
+      if(t.specialFx==="treantRoots"){const angle=Math.atan2(t.y2-t.y,t.x2-t.x),length=Math.hypot(t.x2-t.x,t.y2-t.y),segments=Math.max(3,Math.ceil(length/88)),frame=Math.min(3,Math.floor(pct*4));for(let i=0;i<segments;i++){const q=(i+.5)/segments;drawTreantEffect(frame,lerp(t.x,t.x2,q),lerp(t.y,t.y2,q),length/segments*1.15,45+pct*14,{rotation:angle,alpha:.38+pct*.44});}}
+    }else{
+      const a0=t.angle-t.arc/2,a1=t.angle+t.arc/2;ctx.globalAlpha=.04+pct*.065;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.arc(t.x,t.y,t.range,a0,a1);ctx.closePath();ctx.fill();
+      ctx.globalAlpha=.48+pct*.4;ctx.lineWidth=2;ctx.setLineDash([9,7]);ctx.lineDashOffset=-pct*34;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x+Math.cos(a0)*t.range,t.y+Math.sin(a0)*t.range);ctx.arc(t.x,t.y,t.range,a0,a1);ctx.lineTo(t.x,t.y);ctx.stroke();ctx.setLineDash([]);
+      ctx.globalAlpha=.68;for(const q of [.34,.67]){ctx.beginPath();ctx.arc(t.x,t.y,t.range*q,a0,a1);ctx.stroke();}
+      const sweep=lerp(a0,a1,pct);ctx.globalAlpha=.8;ctx.beginPath();ctx.moveTo(t.x,t.y);ctx.lineTo(t.x+Math.cos(sweep)*t.range,t.y+Math.sin(sweep)*t.range);ctx.stroke();
+    }
+    if(t.monsterFx)drawMonsterTelegraphSprites(t,pct,pulse);
+    ctx.restore();
+  }
+
+  function drawMonsterTelegraphSprites(t,pct,pulse){
+    const fx=t.monsterFx,alpha=.3+pct*.48;
+    if(t.type==="line"){
+      const length=Math.hypot(t.x2-t.x,t.y2-t.y),angle=Math.atan2(t.y2-t.y,t.x2-t.x),count=clamp(Math.ceil(length/92),3,8),size=Math.max(58,length/count*1.03)*pulse;
+      for(let i=0;i<count;i++){const q=(i+.5)/count;drawMonsterEffect(fx.col,fx.row,lerp(t.x,t.x2,q),lerp(t.y,t.y2,q),size,{rotation:angle,alpha});}
+    }else if(t.type==="cone"){
+      for(const q of [.28,.52,.78])drawMonsterEffect(fx.col,fx.row,t.x+Math.cos(t.angle)*t.range*q,t.y+Math.sin(t.angle)*t.range*q,(54+q*40)*pulse,{rotation:t.angle,alpha});
+      for(const side of [-1,1]){const a=t.angle+side*t.arc*.43;drawMonsterEffect(fx.col,fx.row,t.x+Math.cos(a)*t.range*.68,t.y+Math.sin(a)*t.range*.68,66*pulse,{rotation:a,alpha:alpha*.78});}
+    }else{
+      const count=clamp(Math.ceil(t.r/20),4,9),ring=t.r*(.48+pct*.42),size=clamp(t.r*.78,42,92)*pulse;
+      drawMonsterEffect(fx.col,fx.row,t.x,t.y,Math.max(58,t.r*1.12)*pulse,{rotation:pct*Math.PI*.45,alpha:alpha*.72});
+      for(let i=0;i<count;i++){const a=i/count*Math.PI*2+pct*.45;drawMonsterEffect(fx.col,fx.row,t.x+Math.cos(a)*ring,t.y+Math.sin(a)*ring,size,{rotation:a,alpha});}
+    }
+  }
+  function drawProjectile(q){const a=Math.atan2(q.vy,q.vx);if(q.playerFx==="swordWave")drawSwordWave(q.x,q.y,q.radius*5.7,{rotation:a,alpha:.96});else if(q.monsterFx)drawMonsterEffect(q.monsterFx.col,q.monsterFx.row,q.x,q.y,q.radius*5.6,{rotation:a,alpha:.96});else drawEffect(q.effect,q.x,q.y,q.radius*3.8,{rotation:a+(q.team==="player"&&q.effect===3?Math.PI/4:0),alpha:.96});}
   function drawImpactFx(f){const pct=1-f.life/f.max;if(f.treantFx)drawTreantEffect(Math.min(3,Math.floor(pct*4)),f.x,f.y,f.width,f.height*(.7+pct*.3),{rotation:f.rotation,alpha:1-pct*.72});else if(f.monsterFx)drawMonsterEffect(f.monsterFx.col,f.monsterFx.row,f.x,f.y,f.size*(.65+pct*.55),{rotation:f.rotation,alpha:1-pct});else drawEffect(f.effect,f.x,f.y,f.size*(.55+pct*.65),{rotation:f.rotation,alpha:1-pct});}
+
+  function drawParticleFx(p){
+    ctx.save();ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.translate(Math.round(p.x),Math.round(p.y));ctx.rotate(p.rotation||0);ctx.fillStyle=p.color;ctx.strokeStyle=p.color;ctx.lineWidth=2;const s=Math.max(2,Math.round(p.size));
+    if(p.kind==="leaf"){ctx.fillRect(-s/2,-1,s,3);ctx.fillRect(-1,-s/2,3,s);}
+    else if(p.kind==="ember"){ctx.fillRect(-s/3,-s/2,Math.max(2,s/2),s);ctx.globalAlpha*=.35;ctx.fillRect(-s,-s,s*2,s*2);}
+    else if(p.kind==="ice"){ctx.beginPath();ctx.moveTo(0,-s);ctx.lineTo(s*.65,s*.65);ctx.lineTo(-s*.65,s*.65);ctx.closePath();ctx.stroke();}
+    else if(p.kind==="spark"){ctx.beginPath();ctx.moveTo(-s,-s*.5);ctx.lineTo(0,-1);ctx.lineTo(-2,s*.35);ctx.lineTo(s,s);ctx.stroke();}
+    else if(p.kind==="void"){ctx.beginPath();ctx.arc(0,0,s*.8,0,Math.PI*1.55);ctx.stroke();}
+    else ctx.fillRect(-s/2,-s/2,s,s);ctx.restore();
+  }
 
   function drawGroundDrop(d,time){d.life=(d.life||0)+1/60;const bob=Math.sin(time*4+d.x*.02)*3,pulse=.78+.2*Math.sin(time*5+d.y*.03);ctx.save();ctx.globalAlpha=.2+pulse*.12;ctx.fillStyle=d.kind==="equipment"?qualityById(d.item.quality).color:d.kind==="potion"?"#79ef91":BIOMES[game.biome].accent;ctx.beginPath();ctx.ellipse(d.x,d.y+11,25,9,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;if(d.kind==="equipment"){const c=equipmentCoords(d.item);drawAtlasCell(ART.equipment,c.col,c.row,5,5,d.x,d.y-8+bob,48,48);ctx.strokeStyle=qualityById(d.item.quality).color;ctx.strokeRect(d.x-20,d.y-28+bob,40,40);}else if(d.kind==="potion")drawAtlasCell(ART.eliteLoot,game.biome,1,5,2,d.x,d.y-7+bob,46,46);else{const c=materialCoords(d.material);drawAtlasCell(ART.materials,c.col,c.row,5,4,d.x,d.y-7+bob,44,44);}ctx.restore();}
 
@@ -1397,12 +1638,15 @@
     const minY = Math.max(0, Math.floor(game.camera.y / TILE) - 1), maxY = Math.min(w.rows, Math.ceil((game.camera.y + H) / TILE) + 1);
     for (let y = minY; y < maxY; y++) for (let x = minX; x < maxX; x++) drawTile(x, y, w.tiles[y][x], b,time);
     game.resources.forEach(r => drawResource(r, time)); game.altars.forEach(a => drawAltar(a, time));game.groundDrops.forEach(d=>drawGroundDrop(d,time));
+    // Darkness belongs to the environment pass. Drawing it before actors and
+    // combat VFX keeps abyss/forest attacks emissive instead of hiding bosses,
+    // projectiles and telegraphs behind a nearly opaque post-process layer.
+    drawAmbient(time);if (game.biome === 0 || game.biome === 4) drawDarkness();
     game.telegraphs.forEach(drawTelegraph);game.projectiles.forEach(drawProjectile);
     [...game.enemies.filter(e => !e.dead), game.player].sort((a,b2) => a.y - b2.y).forEach(e => e === game.player ? drawPlayer(e, time) : drawEnemy(e, time));
     game.impacts.forEach(drawImpactFx);
-    game.particles.forEach(p => { ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color; ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); }); ctx.globalAlpha = 1;
-    game.numbers.forEach(n => { ctx.globalAlpha = Math.max(0, n.life); ctx.font = "900 13px Microsoft YaHei"; ctx.textAlign = "center"; ctx.fillStyle = "#000"; ctx.fillText(n.text, n.x + 2, n.y + 2); ctx.fillStyle = n.color; ctx.fillText(n.text, n.x, n.y); }); ctx.globalAlpha = 1; ctx.textAlign = "left";
-    drawAmbient(time);if (game.biome === 0 || game.biome === 4) drawDarkness();
+    game.particles.forEach(drawParticleFx);ctx.globalAlpha = 1;
+    game.numbers.forEach(n => { ctx.globalAlpha = Math.max(0, n.life); ctx.font = "900 13px Microsoft YaHei"; ctx.textAlign = "center"; ctx.fillStyle = "#000"; ctx.fillText(n.text, n.x + 2, n.y + 2); ctx.fillStyle = n.color; ctx.fillText(n.text, n.x, n.y); }); ctx.globalAlpha = 1; ctx.textAlign = "left";drawWorldInteractionLabels();
   }
 
   function drawDarkness() {
@@ -1458,25 +1702,48 @@
     requestAnimationFrame(loop);
   }
 
+  function nearbyInteractionGuide(){
+    const p=game.player;
+    if(game.scene==="camp"){
+      if(Math.hypot(p.x-205,p.y-492)<145)return {id:"forge",title:"发现元素锻炉",text:"按 E 打开锻造界面，材料可用于打造、强化、重铸和炼制药剂。"};
+      return null;
+    }
+    if(game.scene!=="expedition")return null;
+    const drop=game.groundDrops.find(d=>dist(d,p)<65);
+    if(drop)return {id:drop.kind==="equipment"?"equipment-drop":drop.kind==="potion"?"potion-drop":"material-drop",title:drop.kind==="equipment"?"发现掉落装备":drop.kind==="potion"?"发现生命药水":"发现稀有材料",text:`靠近后按 E ${drop.kind==="equipment"?"拾取并放入装备背包":drop.kind==="potion"?"拾取并补充药水袋":"拾取并用于高级锻造"}。`};
+    const altar=game.altars.find(a=>!a.lit&&dist(a,p)<60);if(altar)return {id:"altar",title:"发现深渊祭坛",text:"按 E 点燃祭坛，扩大黑暗区域中的可见范围。"};
+    const resource=game.resources.find(r=>!r.gathered&&dist(r,p)<55);if(resource)return {id:"resource",title:"发现可采集资源",text:`按 E 采集${MATERIAL_NAMES[resource.type]}，可用于锻造和药剂。`};
+    if(game.world?.exit){const ex={x:(game.world.exit.x+.5)*TILE,y:(game.world.exit.y+.5)*TILE};if(dist(ex,p)<80)return {id:"portal",title:"发现远征星门",text:`按 E ${game.depth<5?"前往下一深度":"返回星火营地"}。`};}
+    return null;
+  }
+
+  function updateInteractionGuide(){
+    const candidate=nearbyInteractionGuide();if(!candidate||game.save.tutorial.interactions[candidate.id]||isModalOpen())return;
+    game.save.tutorial.interactions[candidate.id]=true;document.documentElement.dataset.lastInteractionHint=candidate.id;saveGame(true);
+  }
+
   function updateHUD() {
     if (game.scene === "title") return;
+    updateInteractionGuide();
     const st = stats(), p = game.save.player, need = xpNeeded();
     p.hp = clamp(p.hp, 0, st.maxHp);
     $("hud-level").textContent = `LV.${p.level}`;
     $("hp-fill").style.width = `${p.hp / st.maxHp * 100}%`; $("hp-text").textContent = `${fmt(p.hp)} / ${fmt(st.maxHp)}`;
     $("stamina-fill").style.width = `${p.stamina}%`; $("stamina-text").textContent = `${fmt(p.stamina)} / 100`;
     $("xp-fill").style.width = `${p.xp / need * 100}%`; $("xp-text").textContent = `${fmt(p.xp)} / ${fmt(need)}`;
-    $("gold-text").textContent = fmt(game.save.currencies.gold); $("void-text").textContent = fmt(game.save.currencies.void); $("potion-text").textContent = `×${p.potions}`;
+    $("gold-text").textContent = fmt(game.save.currencies.gold); $("void-text").textContent = fmt(game.save.currencies.void);
     $("bag-badge").textContent = game.unseenItems ? `+${game.unseenItems} · ${game.save.equipment.inventory.length}/${INVENTORY_CAPACITY}` : `${game.save.equipment.inventory.length} / ${INVENTORY_CAPACITY}`;
+    $("inventory-btn").dataset.tooltip=`背包 · ${game.unseenItems?`+${game.unseenItems} · `:""}${game.save.equipment.inventory.length} / ${INVENTORY_CAPACITY}`;
     $("inventory-btn").classList.toggle("has-new", game.unseenItems > 0);
     $("forge-dock-btn")?.classList.toggle("hidden",game.scene!=="camp");
     $("return-dock-btn")?.classList.toggle("hidden",game.scene!=="expedition");
     $("sp-badge").textContent = game.save.player.skillPoints ? `${game.save.player.skillPoints} 点可用` : "0 点";
+    $("skill-dock-btn").dataset.tooltip=game.save.player.skillPoints?`战技 / 天赋 · ${game.save.player.skillPoints} 点可用`:"战技 / 天赋";
     if (game.scene === "camp") {
       $("area-name").textContent = "星火营地"; $("depth-text").textContent = "安全区 · 可自由移动"; $("explore-text").textContent="探索 100%"; $("quest-text").textContent = "WASD 在营地移动；按 M 选择远征，按 B 打造装备";
       $("boss-wrap").classList.add("hidden"); return;
     }
-    const b = BIOMES[game.biome],explored=explorationPercent(),track=STAGE_TRACK_NAMES[game.biome][game.depth-1]; $("area-name").textContent = b.name; $("depth-text").textContent = `深度 ${game.depth} / 5 · ♫ ${track}`;$("explore-text").textContent=`探索 ${explored}%`;
+    const b = BIOMES[game.biome],explored=explorationPercent(),track=resolveBgmTrack(stageMusicKey(game.biome,game.depth)).title; $("area-name").textContent = b.name; $("depth-text").textContent = `深度 ${game.depth} / 5 · ♫ ${track}`;$("explore-text").textContent=`探索 ${explored}%`;
     const boss = game.enemies.find(e => e.boss && !e.dead);
     if (boss) {
       $("boss-wrap").classList.remove("hidden"); $("boss-name").textContent = boss.name; $("boss-fill").style.width = `${Math.max(0,boss.hp / boss.maxHp * 100)}%`;
@@ -1484,12 +1751,10 @@
     } else {
       $("boss-wrap").classList.add("hidden");
       const ex = game.world.exit?{ x: (game.world.exit.x + .5) * TILE, y: (game.world.exit.y + .5) * TILE }:null;
-      const nearby = game.resources.find(r => !r.gathered && dist(r, game.player) < 55);
       const drop = game.groundDrops.find(d=>dist(d,game.player)<65);
       const altar = game.altars.find(a => !a.lit && dist(a, game.player) < 60);
       if(drop) $("quest-text").textContent=`按 E 拾取${drop.kind==="equipment"?drop.item.name:drop.kind==="potion"?"生命药水":MATERIAL_NAMES[drop.material]}`;
       else if (altar) $("quest-text").textContent = "按 E 点燃深渊祭坛，扩展视野";
-      else if (nearby) $("quest-text").textContent = `按 E 开采${MATERIAL_NAMES[nearby.type]}`;
       else if (ex&&dist(ex, game.player) < 80) $("quest-text").textContent = `按 E 进入${game.depth < 5 ? "下一深度" : "返程星门"}`;
       else if(ex)$("quest-text").textContent=`星门已在附近出现 · 地图探索 ${explored}%`;
       else {const remaining=game.enemies.filter(e=>!e.dead&&!e.boss).length;$("quest-text").textContent=game.depth===5?"穿越迷宫，寻找盘踞核心的区域领主":`清除本层敌人：剩余 ${remaining} · 探索 ${explored}%`;}
@@ -1504,6 +1769,7 @@
     if (id === "skills-panel") renderSkills();
     if (id === "forge-panel") renderForge();
     if (id === "save-panel") renderSavePanel();
+    if (id === "settings-panel") renderSettingsPanel();
     panel.classList.remove("hidden");
     if (id === "map-panel") drawWorldMap();
     game.paused = true;
@@ -1520,16 +1786,41 @@
     $("tooltip").classList.add("hidden"); if (game.scene !== "title") game.paused = false;
   }
 
-  function renderSavePanel(){const root=$("save-slots");if(!root)return;const entries=[{name:"自动存档",loaded:readSavedGame(),auto:true},...SLOT_SAVE_KEYS.map((k,i)=>({name:`手动存档 ${i+1}`,loaded:readSaveKey(k,`slot-${i+1}`),index:i}))];root.innerHTML="";entries.forEach(entry=>{const l=entry.loaded,node=document.createElement("article"),place=l?.session?.scene==="expedition"?`${BIOMES[l.session.biome]?.name||"远征"} · 深度 ${l.session.depth}/5`:l?"星火营地":"空档位",when=l?.savedAt?new Date(l.savedAt).toLocaleString("zh-CN"):"尚未保存";node.className=`save-slot ${entry.auto?"current":""}`;node.innerHTML=`<div><h3>${entry.name}</h3><p>${place} · ${when}${l?` · LV.${l.save.player.level}`:""}</p></div><div class="save-slot-actions">${l?'<button class="load-slot primary">载入</button>':""}${game.scene!=="title"?`<button class="write-slot">${entry.auto?"覆盖自动档":"保存到此档"}</button>`:""}</div>`;node.querySelector(".load-slot")?.addEventListener("click",()=>loadDecodedGame(l));node.querySelector(".write-slot")?.addEventListener("click",()=>entry.auto?(saveGame(false),renderSavePanel()):saveGameToSlot(entry.index));root.append(node);});}
+  function renderSavePanel(){
+    const root=$("save-slots");if(!root)return;
+    const template={save:createFullUnlockTestSave(),session:{scene:"camp"},savedAt:0,source:"full-unlock-template"};
+    const entries=[
+      {name:"自动存档",loaded:readSavedGame(),auto:true},
+      ...SLOT_SAVE_KEYS.map((key,index)=>({name:`手动存档 ${index+1}`,loaded:readSaveKey(key,`slot-${index+1}`),index})),
+      {name:"全解锁测试档（内置）",loaded:template,template:true}
+    ];
+    root.innerHTML="";
+    entries.forEach(entry=>{
+      const loaded=entry.loaded,node=document.createElement("article");
+      const place=entry.template?"五域 25 层全通关 · 五把传说武器 · 药水 99":loaded?.session?.scene==="expedition"?`${BIOMES[loaded.session.biome]?.name||"远征"} · 深度 ${loaded.session.depth}/5`:loaded?"星火营地":"空档位";
+      const when=entry.template?"随时可重置":loaded?.savedAt?new Date(loaded.savedAt).toLocaleString("zh-CN"):"尚未保存";
+      node.className=`save-slot ${entry.auto?"current":""} ${entry.template?"test-template":""}`;
+      node.innerHTML=`<div><h3>${entry.name}</h3><p>${place} · ${when}${loaded?` · LV.${loaded.save.player.level}`:""}</p></div><div class="save-slot-actions">${loaded?`<button class="load-slot primary">${entry.template?"载入测试档":"载入"}</button>`:""}${game.scene!=="title"&&!entry.template?`<button class="write-slot">${entry.auto?"覆盖自动档":"保存到此档"}</button>`:""}</div>`;
+      const loadButton=node.querySelector(".load-slot"),writeButton=node.querySelector(".write-slot");
+      if(loadButton){loadButton.type="button";loadButton.onclick=event=>{event.preventDefault();event.stopPropagation();entry.template?installFullUnlockTestSave():loadDecodedGame(loaded);};}
+      if(writeButton){writeButton.type="button";writeButton.onclick=event=>{event.preventDefault();event.stopPropagation();entry.auto?(saveGame(false),renderSavePanel()):saveGameToSlot(entry.index);};}
+      root.append(node);
+    });
+  }
+
+  function renderSettingsPanel(){updateSettingsControls();const root=$("settings-save-summary");if(!root)return;const entries=[{name:"自动存档",loaded:readSavedGame()},...SLOT_SAVE_KEYS.map((key,index)=>({name:`手动存档 ${index+1}`,loaded:readSaveKey(key,`slot-${index+1}`)}))];root.innerHTML=entries.map(entry=>{const l=entry.loaded,place=l?.session?.scene==="expedition"?`${BIOMES[l.session.biome]?.name||"远征"} 深度 ${l.session.depth}`:l?"星火营地":"空档位",when=l?.savedAt?new Date(l.savedAt).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";return`<p><strong>${entry.name}</strong><span>${place} · ${when}</span></p>`;}).join("");}
 
   function renderContinentPanel() {
-    const grid = $("continent-grid"); grid.innerHTML = "";
-    BIOMES.forEach((b, i) => {
-      const unlocked = game.save.progress.unlocked.includes(i), completed = game.save.progress.completedDepths[i] || 0;
-      const card = document.createElement("article"); card.className = `continent-card${unlocked ? "" : " locked"}`; card.style.setProperty("--biome", b.color);
-      card.innerHTML = `<span class="continent-index">0${i+1}</span><h3>${b.name}</h3><strong>${b.subtitle}</strong><p>${b.mechanic}</p><ul><li>资源：${b.primaryName} · ${b.oreName}</li><li>领主：${b.boss[0]}</li><li>封印次数：${game.save.progress.bossKills[i] || 0}</li></ul><div class="depth-pips">${[1,2,3,4,5].map(d=>`<i class="${d<=completed?"done":""}"></i>`).join("")}</div><button ${unlocked?"":"disabled"}>${unlocked ? (completed >= 5 ? "再次远征" : "进入大陆") : "击败前域领主解锁"}</button>`;
-      card.querySelector("button").addEventListener("click", () => enterFloor(i, 1)); grid.append(card);
-    });
+    const root=$("continent-hotspots"),info=$("continent-info"),zones=[
+      {left:4,top:3,width:39,height:48,shape:"polygon(5% 28%,25% 7%,72% 5%,98% 42%,88% 80%,55% 100%,18% 89%,0 60%)"},
+      {left:2,top:46,width:48,height:54,shape:"polygon(9% 12%,55% 0,91% 24%,100% 67%,74% 96%,29% 100%,0 72%)"},
+      {left:42,top:2,width:34,height:45,shape:"polygon(24% 0,72% 8%,100% 43%,80% 88%,42% 100%,0 70%,4% 25%)"},
+      {left:61,top:27,width:39,height:47,shape:"polygon(28% 0,74% 8%,100% 37%,94% 76%,59% 100%,15% 83%,0 48%)"},
+      {left:41,top:56,width:45,height:44,shape:"polygon(20% 0,71% 3%,100% 35%,88% 78%,55% 100%,13% 87%,0 48%)"}
+    ];root.innerHTML="";
+    const showInfo=(i,selecting=false)=>{const b=BIOMES[i],unlocked=game.save.progress.unlocked.includes(i),completed=game.save.progress.completedDepths[i]||0,maxDepth=unlocked?Math.min(5,Math.max(1,completed+1)):0;info.style.setProperty("--biome",b.color);info.classList.toggle("selecting",selecting&&unlocked);info.innerHTML=`<h3>0${i+1} · ${b.name}</h3><p>${b.subtitle} · ${b.mechanic}<br>资源：${b.primaryName}、${b.oreName}　领主：${b.boss[0]}<br>${unlocked?`已通过深度 ${completed}/5 · ${selecting?"选择出发深度":"点击大陆选择关卡"}`:"击败前一领域领主后解锁"}</p><div class="depth-pips">${[1,2,3,4,5].map(d=>`<i class="${d<=completed?"done":""}" style="--biome:${b.color}"></i>`).join("")}</div>${selecting&&unlocked?`<div class="depth-select" aria-label="${b.name}关卡选择">${[1,2,3,4,5].map(d=>`<button type="button" data-depth="${d}" ${d>maxDepth?"disabled":""} class="${d<=completed?"cleared":d===completed+1?"frontier":""}"><b>${d}</b><small>${d<=completed?"已通关":d===completed+1?"继续推进":"未解锁"}</small></button>`).join("")}</div>`:""}`;if(selecting)info.querySelectorAll("[data-depth]").forEach(depthButton=>depthButton.addEventListener("click",()=>{const depth=Number(depthButton.dataset.depth);document.documentElement.dataset.qaLast=`map-enter:${i}:${depth}`;enterFloor(i,depth);game.qaUpdateStatus?.();}));};
+    BIOMES.forEach((b,i)=>{const unlocked=game.save.progress.unlocked.includes(i),zone=zones[i],button=document.createElement("button");button.className=`continent-hotspot continent-${i}${unlocked?"":" locked"}`;button.style.setProperty("--left",`${zone.left}%`);button.style.setProperty("--top",`${zone.top}%`);button.style.setProperty("--width",`${zone.width}%`);button.style.setProperty("--height",`${zone.height}%`);button.style.setProperty("--shape",zone.shape);button.style.setProperty("--biome",b.color);button.disabled=!unlocked;button.setAttribute("aria-label",`${b.name}，${unlocked?"选择关卡":"尚未解锁"}`);button.innerHTML=`<span>${unlocked?b.name:`${b.name} · 锁定`}</span>`;button.addEventListener("pointerenter",()=>{if(!info.classList.contains("selecting"))showInfo(i);});button.addEventListener("focus",()=>{if(!info.classList.contains("selecting"))showInfo(i);});button.addEventListener("click",()=>showInfo(i,true));root.append(button);});
+    showInfo(Math.max(0,...game.save.progress.unlocked));
   }
 
   function formatStat(type, value) {
@@ -1562,6 +1853,8 @@
 
   function renderCharacterPanel() {
     game.unseenItems = 0;
+    document.querySelectorAll("[data-inventory-tab]").forEach(button=>{const active=button.dataset.inventoryTab===game.inventoryTab;button.classList.toggle("active",active);button.setAttribute("aria-selected",String(active));button.onclick=()=>{game.inventoryTab=button.dataset.inventoryTab;renderCharacterPanel();};});
+    document.querySelectorAll("[data-inventory-pane]").forEach(pane=>pane.classList.toggle("active",pane.dataset.inventoryPane===game.inventoryTab));
     const equipment = $("equipment-slots"); equipment.innerHTML = "";
     Object.entries(SLOT_NAMES).forEach(([slot, label]) => {
       const item = game.save.equipment.equipped[slot]; const node = document.createElement("div"); node.dataset.slot = slot; node.className = `equipment-slot ${item ? `quality-${item.quality}` : "empty"}`; node.innerHTML = item ? `${itemArtHTML(item)}<b>${item.name}</b><span>${item.main.type === "attack" ? "攻" : item.main.type === "defense" ? "防" : "命"} ${itemMainValue(item)}</span>` : `<span>${label}</span>`;
@@ -1579,7 +1872,9 @@
     pageItems.forEach(item=>{const n=document.createElement("div");n.className=`item-cell quality-${item.quality}`;n.innerHTML=`${itemArtHTML(item)}<b>${item.name}</b>${item.enhance?`<span class="plus">+${item.enhance}</span>`:""}<button class="sell-btn" title="出售装备">售</button>`;bindItemTooltip(n,item,game.save.equipment.equipped[item.slot]);n.addEventListener("click",()=>equipItem(item.id));n.querySelector(".sell-btn").addEventListener("click",e=>{e.stopPropagation();sellItem(item.id);});grid.append(n);});
     for(let i=pageItems.length;i<INVENTORY_PAGE_SIZE;i++){const n=document.createElement("div");n.className="item-cell";grid.append(n);}
     $("inventory-prev").onclick=()=>{game.inventoryPage=Math.max(0,game.inventoryPage-1);renderCharacterPanel();};$("inventory-next").onclick=()=>{game.inventoryPage=Math.min(pageCount-1,game.inventoryPage+1);renderCharacterPanel();};const bulkSelect=$("bulk-quality"),bulkButton=$("bulk-sell-btn"),refreshBulk=()=>{const q=bulkSelect.value,count=inv.filter(item=>item.quality===q).length;bulkButton.textContent=`出售该品质（${count}）`;bulkButton.disabled=!count;};bulkSelect.onchange=refreshBulk;bulkButton.onclick=()=>sellQuality(bulkSelect.value);refreshBulk();
-    $("materials-list").innerHTML = Object.entries(game.save.materials).filter(([,v])=>v>0).map(([k,v])=>`<div class="material">${materialArtHTML(k)}<span>${MATERIAL_NAMES[k]}</span><b>${v}</b></div>`).join("") || `<div class="hint">尚未获得材料</div>`;
+    const materialEntries=Object.entries(game.save.materials),materialTotal=materialEntries.reduce((sum,[,value])=>sum+value,0);$("material-count").textContent=fmt(materialTotal);
+    $("materials-list").innerHTML = materialEntries.map(([k,v])=>`<div class="material${v?"":" empty"}">${materialArtHTML(k)}<span>${MATERIAL_NAMES[k]}</span><b>${v}</b></div>`).join("");
+    $("consumable-count").textContent=String(game.save.player.potions);$("consumables-list").innerHTML=`<div class="consumable-card"><span class="item-art" aria-hidden="true"></span><span>生命药水<small>恢复 38% 最大生命，Q 快捷使用</small></span><b>×${game.save.player.potions}</b></div><div class="consumable-card"><span class="material-art" style="--art-col:4;--art-row:3" aria-hidden="true"></span><span>卷轴栏位<small>预留：临时增益与传送卷轴</small></span><b>开发中</b></div><div class="consumable-card"><span class="material-art" style="--art-col:3;--art-row:3" aria-hidden="true"></span><span>战斗道具栏位<small>预留：投掷物与元素药剂</small></span><b>开发中</b></div>`;
     updateHUD();
   }
 
@@ -1614,19 +1909,32 @@
     if(game.forgeTab==="craft")renderCraft();else if(game.forgeTab==="enhance")renderEnhance();else renderReforge();
   }
 
+  function markQa(last, detail = null) {
+    if (document.documentElement.dataset.qaMode !== "enabled") return;
+    document.documentElement.dataset.qaLast = last;
+    if (detail) document.documentElement.dataset.qaForgeReport = JSON.stringify(detail);
+    game.qaUpdateStatus?.();
+  }
+
   function renderCraft() {
     const unlocked=BIOMES.filter((_,i)=>game.save.progress.unlocked.includes(i));
-    $("forge-content").innerHTML=`<div class="forge-layout"><div class="forge-side"><h3>元素配方</h3><select id="craft-region">${unlocked.map(b=>`<option value="${BIOMES.indexOf(b)}">${b.name}</option>`).join("")}</select><p class="hint">采集材料用于打造与药剂；怪物专属稀材可提高品质，领主核心可保底稀有。</p><label class="recipe-item"><span>投入怪物稀材 ×2</span><input id="use-rare" type="checkbox"></label><label class="recipe-item"><span>投入领主核心 ×1</span><input id="use-core" type="checkbox"></label><button id="potion-btn" class="full">炼制生命药水</button></div><div class="forge-main"><div id="furnace" class="furnace">♨</div><div id="craft-recipe" class="recipe-list"></div><button id="craft-btn" class="primary full">点燃熔炉</button></div></div>`;
-    const select=$("craft-region");const refresh=()=>{const i=Number(select.value),b=BIOMES[i],gold=35+i*25;$("craft-recipe").innerHTML=`<div class="recipe-item">${materialArtHTML(b.primary)}<span>${b.primaryName}</span><b>${game.save.materials[b.primary]} / 6</b></div><div class="recipe-item">${materialArtHTML(b.ore)}<span>${b.oreName}</span><b>${game.save.materials[b.ore]} / 4</b></div><div class="recipe-item"><span>金币</span><b>${game.save.currencies.gold} / ${gold}</b></div><div class="recipe-item">${materialArtHTML(b.rare)}<span>${b.rareName}</span><b>${game.save.materials[b.rare]||0}</b></div><div class="recipe-item">${materialArtHTML(b.core)}<span>${MATERIAL_NAMES[b.core]}</span><b>${game.save.materials[b.core]||0}</b></div>`;};select.addEventListener("change",refresh);refresh();$("craft-btn").addEventListener("click",()=>craft(Number(select.value),$("use-core").checked,$("use-rare").checked));$("potion-btn").addEventListener("click",()=>brewPotion(Number(select.value)));
+    const unlockedIndices=unlocked.map(b=>BIOMES.indexOf(b));if(!unlockedIndices.includes(Number(game.selectedForge)))game.selectedForge=unlockedIndices[0]??0;
+    $("forge-content").innerHTML=`<div class="forge-layout"><div class="forge-side"><h3>元素配方</h3><select id="craft-region">${unlocked.map(b=>{const i=BIOMES.indexOf(b);return`<option value="${i}" ${i===Number(game.selectedForge)?"selected":""}>${b.name}</option>`;}).join("")}</select><p class="hint">怪物掉落材料用于打造与药剂；专属稀材可提高品质，领主核心可保底稀有。</p><label class="recipe-item"><span>投入怪物稀材 ×2</span><input id="use-rare" type="checkbox" ${game.forgeCatalysts.rare?"checked":""}></label><label class="recipe-item"><span>投入领主核心 ×1</span><input id="use-core" type="checkbox" ${game.forgeCatalysts.core?"checked":""}></label><button id="potion-btn" class="full">炼制生命药水</button></div><div class="forge-main"><div id="furnace" class="furnace">♨</div><div id="craft-recipe" class="recipe-list"></div><button id="craft-btn" class="primary full">点燃熔炉</button></div></div>`;
+    const select=$("craft-region"),rare=$("use-rare"),core=$("use-core");
+    const refresh=()=>{const i=Number(select.value),b=BIOMES[i],gold=35+i*25;game.selectedForge=i;document.documentElement.dataset.forgeRegion=String(i);$("craft-recipe").innerHTML=`<div class="recipe-item">${materialArtHTML(b.primary)}<span>${b.primaryName}</span><b>${game.save.materials[b.primary]} / 6</b></div><div class="recipe-item">${materialArtHTML(b.ore)}<span>${b.oreName}</span><b>${game.save.materials[b.ore]} / 4</b></div><div class="recipe-item"><span>金币</span><b>${game.save.currencies.gold} / ${gold}</b></div><div class="recipe-item">${materialArtHTML(b.rare)}<span>${b.rareName}</span><b>${game.save.materials[b.rare]||0}</b></div><div class="recipe-item">${materialArtHTML(b.core)}<span>${MATERIAL_NAMES[b.core]}</span><b>${game.save.materials[b.core]||0}</b></div>`;game.qaUpdateStatus?.();};
+    select.addEventListener("change",()=>{refresh();markQa(`forge-select:${game.selectedForge}`,{ok:true,phase:"select",region:game.selectedForge});});rare.addEventListener("change",()=>game.forgeCatalysts.rare=rare.checked);core.addEventListener("change",()=>game.forgeCatalysts.core=core.checked);refresh();$("craft-btn").addEventListener("click",()=>craft(game.selectedForge,core.checked,rare.checked));$("potion-btn").addEventListener("click",()=>brewPotion(game.selectedForge));
   }
 
   function craft(i,useCore,useRare) {
-    const b=BIOMES[i],gold=35+i*25;if(game.save.materials[b.primary]<6||game.save.materials[b.ore]<4||game.save.currencies.gold<gold)return toast("打造材料不足","#ef7268");
-    if(useRare&&(game.save.materials[b.rare]||0)<2)return toast(`需要 ${b.rareName} ×2`,"#ef7268");if(useCore&&(game.save.materials[b.core]||0)<1)return toast("尚未获得该领主核心","#ef7268");game.save.materials[b.primary]-=6;game.save.materials[b.ore]-=4;game.save.currencies.gold-=gold;if(useRare)game.save.materials[b.rare]-=2;if(useCore)game.save.materials[b.core]--;
-    const furnace=$("furnace");furnace.classList.add("firing");game.paused=true;playSfx("craft");setTimeout(()=>{const item=generateItem(i,5,useCore?2:useRare?1:0,new RNG(Date.now()+"craft"));if(useRare&&!item.affixes.some(a=>a.special)){const rng=new RNG(Date.now()+"rare-catalyst"),a=rng.pick(SPECIAL_AFFIXES);item.affixes.push({type:a[0],name:a[1],value:lerp(a[2],a[3],rng.next())*(1+i*.12),suffix:a[4],special:true});}addItem(item);furnace.classList.remove("firing");renderCraft();updateHUD();saveGame(true);beep(item.quality==="gold"?830:520,.25,"triangle",.05);},850);
+    const b=BIOMES[i],plan=ForgeRules.createCraftPlan(i,b,useCore,useRare),verdict=ForgeRules.validateCraftPlan(plan,{gold:game.save.currencies.gold,materials:game.save.materials}),gold=plan.gold;
+    if(!verdict.ok){markQa(`craft-failed:${verdict.reason}`,{ok:false,reason:verdict.reason,region:i});if(verdict.reason==="rare")return toast(`需要 ${b.rareName} ×2`,"#ef7268");if(verdict.reason==="core")return toast("尚未获得该领主核心","#ef7268");return toast(verdict.reason==="gold"?"打造金币不足":"打造材料不足","#ef7268");}
+    const before={inventory:game.save.equipment.inventory.length,gold:game.save.currencies.gold,primary:game.save.materials[b.primary],ore:game.save.materials[b.ore],rare:game.save.materials[b.rare]||0,core:game.save.materials[b.core]||0};
+    const charged=ForgeRules.applyCraftPlan(plan,{gold:game.save.currencies.gold,materials:game.save.materials});game.save.materials=charged.materials;game.save.currencies.gold=charged.gold;
+    markQa("craft-queued",{ok:true,phase:"queued",region:i,useCore,useRare,before});
+    const furnace=$("furnace");furnace.classList.add("firing");game.paused=true;playSfx("craft");setTimeout(()=>{const item=generateItem(i,5,useCore?2:useRare?1:0,new RNG(Date.now()+"craft"));if(useRare&&!item.affixes.some(a=>a.special)){const rng=new RNG(Date.now()+"rare-catalyst"),a=rng.pick(SPECIAL_AFFIXES);item.affixes.push({type:a[0],name:a[1],value:lerp(a[2],a[3],rng.next())*(1+i*.12),suffix:a[4],special:true});}addItem(item);furnace.classList.remove("firing");renderCraft();updateHUD();saveGame(true);const after={inventory:game.save.equipment.inventory.length,gold:game.save.currencies.gold,primary:game.save.materials[b.primary],ore:game.save.materials[b.ore],rare:game.save.materials[b.rare]||0,core:game.save.materials[b.core]||0};const report={ok:true,phase:"complete",region:i,useCore,useRare,before,after,item:{id:item.id,slot:item.slot,quality:item.quality,affixes:item.affixes.length,specialAffixes:item.affixes.filter(a=>a.special).length,legendary:Boolean(item.legendary)}};markQa(`craft-success:r${i}:q${item.quality}:a${item.affixes.length}:s${report.item.specialAffixes}`,report);beep(item.quality==="gold"?830:520,.25,"triangle",.05);},850);
   }
 
-  function brewPotion(i){const b=BIOMES[i];if(game.save.player.potions>=8)return toast("药水袋已装满（8 / 8）");if(game.save.materials[b.primary]<3||game.save.materials[b.ore]<1)return toast(`需要 ${b.primaryName} ×3、${b.oreName} ×1`,"#ef7268");game.save.materials[b.primary]-=3;game.save.materials[b.ore]-=1;game.save.player.potions++;toast("炼制生命药水 ×1","#8be89f");beep(480,.18,"sine",.04);renderCraft();updateHUD();saveGame(true);}
+  function brewPotion(i){const b=BIOMES[i];if(game.save.player.potions>=POTION_CAPACITY)return toast(`药水袋已装满（${POTION_CAPACITY} / ${POTION_CAPACITY}）`);if(game.save.materials[b.primary]<3||game.save.materials[b.ore]<1)return toast(`需要 ${b.primaryName} ×3、${b.oreName} ×1`,"#ef7268");game.save.materials[b.primary]-=3;game.save.materials[b.ore]-=1;game.save.player.potions++;toast("炼制生命药水 ×1","#8be89f");beep(480,.18,"sine",.04);renderCraft();updateHUD();saveGame(true);}
 
   function equippedOptions() {return Object.values(game.save.equipment.equipped).filter(Boolean).map(i=>`<option value="${i.id}">${SLOT_NAMES[i.slot]} · ${i.name} +${i.enhance}</option>`).join("");}
   function findEquipped(id){return Object.values(game.save.equipment.equipped).find(i=>i&&i.id===id);}
@@ -1668,23 +1976,23 @@
     if(e.code==="KeyB"){if(game.scene==="camp")openPanel("forge-panel");else toast("铁匠铺只在星火营地开放");return;}
     if(e.code==="KeyL")return isModalOpen()?closeAllModals():openPanel("save-panel");
     if(e.code==="KeyT"&&game.scene==="expedition")return enterCamp(false);
-    if(isModalOpen())return;if(e.code==="Space")dash();else if(e.code==="KeyQ")usePotion();else if(e.code==="KeyE")interact();else if(e.code==="KeyJ")attack(true);else if(e.code==="KeyR")useActiveSkill(1);else if(e.code==="KeyF")useActiveSkill(2);
+    if(isModalOpen())return;if(e.code==="Space")dash();else if(e.code==="KeyQ")usePotion();else if(e.code==="KeyE")interact();else if(e.code==="KeyJ")attack();else if(e.code==="KeyR")useActiveSkill(1);else if(e.code==="KeyF")useActiveSkill(2);
   }
 
   function setupEvents(){
     $("new-game-btn").addEventListener("click",startNewGame);$("continue-btn").addEventListener("click",continueGame);updateTitleSaveMeta();setMusicTheme("title");
+    updateSettingsControls();
     document.querySelectorAll("[data-close]").forEach(b=>b.addEventListener("click",()=>closePanel(b.dataset.close)));
-    $("skills-btn").addEventListener("click",()=>openPanel("skills-panel"));$("resume-btn").addEventListener("click",()=>closePanel("pause-panel"));$("save-btn").addEventListener("click",()=>saveGame(false));$("pause-save-list-btn").addEventListener("click",()=>openPanel("save-panel"));
+    $("skills-btn").addEventListener("click",()=>openPanel("skills-panel"));$("resume-btn").addEventListener("click",()=>closePanel("pause-panel"));$("save-btn").addEventListener("click",()=>saveGame(false));$("pause-save-list-btn").addEventListener("click",()=>openPanel("save-panel"));$("pause-settings-btn").addEventListener("click",()=>openPanel("settings-panel"));
     $("inventory-btn").addEventListener("click",()=>openPanel("character-panel"));$("skill-dock-btn").addEventListener("click",()=>openPanel("skills-panel"));$("map-dock-btn").addEventListener("click",()=>game.scene==="camp"?openPanel("continent-panel"):openPanel("map-panel"));
     $("forge-dock-btn").addEventListener("click",()=>game.scene==="camp"?openPanel("forge-panel"):toast("铁匠铺只在星火营地开放"));
     $("map-zoom-out").addEventListener("click",()=>setMapZoom(game.mapZoom-.5));$("map-zoom-in").addEventListener("click",()=>setMapZoom(game.mapZoom+.5));$("map-zoom-reset").addEventListener("click",()=>setMapZoom(1));worldMap.addEventListener("wheel",e=>{e.preventDefault();setMapZoom(game.mapZoom+(e.deltaY<0?.5:-.5));},{passive:false});
-    $("save-list-btn").addEventListener("click",()=>openPanel("save-panel"));$("return-dock-btn").addEventListener("click",()=>enterCamp(false));$("return-camp-btn").addEventListener("click",()=>enterCamp(false));$("revive-btn").addEventListener("click",()=>enterCamp(false));
+    $("save-list-btn").addEventListener("click",()=>openPanel("save-panel"));$("settings-dock-btn").addEventListener("click",()=>openPanel("settings-panel"));$("title-settings-btn").addEventListener("click",()=>openPanel("settings-panel"));$("settings-save-list-btn").addEventListener("click",()=>openPanel("save-panel"));$("settings-music-toggle").addEventListener("click",()=>setMusicEnabled(game.save.settings.music===false));$("settings-sound-toggle").addEventListener("click",()=>setSoundEnabled(game.save.settings.sound===false));$("bgm-volume").addEventListener("input",e=>setBgmVolume(Number(e.target.value)/100));$("return-dock-btn").addEventListener("click",()=>enterCamp(false));$("return-camp-btn").addEventListener("click",()=>enterCamp(false));$("revive-btn").addEventListener("click",()=>enterCamp(false));
     document.querySelectorAll("[data-forge-tab]").forEach(b=>b.addEventListener("click",()=>{game.forgeTab=b.dataset.forgeTab;renderForge();}));
     addEventListener("keydown",handleKeyDown);addEventListener("keyup",e=>{game.keys.delete(e.code);if(game.player.runKey===e.code){game.player.runKey=null;game.player.running=false;}});addEventListener("blur",()=>{game.keys.clear();game.player.running=false;});
-    canvas.addEventListener("pointermove",e=>{const r=canvas.getBoundingClientRect();game.mouse.x=(e.clientX-r.left)/r.width*W;game.mouse.y=(e.clientY-r.top)/r.height*H;if(game.scene!=="title"&&!game.player.swing){const wx=game.mouse.x+game.camera.x,wy=game.mouse.y+game.camera.y;setPlayerAim(wx-game.player.x,wy-game.player.y);}});
-    canvas.addEventListener("pointerdown",e=>{if(e.button===0){canvas.focus();attack(false);}});canvas.addEventListener("contextmenu",e=>e.preventDefault());
-    const currentMusicKey=()=>game.scene==="title"?"title":game.scene==="camp"?"camp":stageMusicKey(game.biome,game.depth),unlockAudio=()=>{ensureAudio();setMusicTheme(currentMusicKey());};addEventListener("pointerdown",unlockAudio,{once:true,capture:true});addEventListener("keydown",unlockAudio,{once:true,capture:true});addEventListener("focus",()=>{if(game.audio?.ctx){ensureAudio();if(game.audio.theme!==currentMusicKey())startMusic(currentMusicKey());}});addEventListener("pagehide",()=>{if(game.scene!=="title")saveGame(true);});
-    document.querySelectorAll("#mobile-controls button").forEach(b=>{const code=b.dataset.key;b.addEventListener("pointerdown",e=>{e.preventDefault();game.keys.add(code);if(code==="KeyJ")attack(true);if(code==="KeyR")useActiveSkill(1);if(code==="Space")dash();if(code==="KeyE")interact();});b.addEventListener("pointerup",()=>game.keys.delete(code));b.addEventListener("pointercancel",()=>game.keys.delete(code));});
+    canvas.addEventListener("pointerdown",e=>{if(e.button===0)canvas.focus();});
+    const currentMusicKey=()=>game.scene==="title"?"title":game.scene==="camp"?"camp":stageMusicKey(game.biome,game.depth),unlockAudio=()=>{ensureAudio();setMusicTheme(currentMusicKey());};addEventListener("pointerdown",unlockAudio,{once:true,capture:true});addEventListener("keydown",unlockAudio,{once:true,capture:true});addEventListener("focus",()=>{if(game.audio?.ctx){ensureAudio();if(game.save.settings.music&&game.audio.theme!==currentMusicKey())startMusic(currentMusicKey());}});addEventListener("pagehide",()=>{if(game.scene!=="title")saveGame(true);});
+    document.querySelectorAll("#mobile-controls button").forEach(b=>{const code=b.dataset.key;b.addEventListener("pointerdown",e=>{e.preventDefault();game.keys.add(code);if(code==="KeyJ")attack();if(code==="KeyR")useActiveSkill(1);if(code==="Space")dash();if(code==="KeyE")interact();});b.addEventListener("pointerup",()=>game.keys.delete(code));b.addEventListener("pointercancel",()=>game.keys.delete(code));});
   }
 
   function resizeShell(){const shell=$("game-shell"),scale=Math.max(.1,Math.min(innerWidth/W,innerHeight/H)),scaledW=W*scale,scaledH=H*scale;shell.style.left=`${Math.max(0,(innerWidth-scaledW)/2)}px`;shell.style.top=`${Math.max(0,(innerHeight-scaledH)/2)}px`;shell.style.transform=`scale(${scale})`;}
@@ -1693,22 +2001,27 @@
     const localHost=["127.0.0.1","localhost","::1"].includes(location.hostname),requested=new URLSearchParams(location.search).has("qa");
     if(!localHost||!requested)return;
     const panel=$("qa-panel"),biomeSelect=$("qa-biome"),depthSelect=$("qa-depth");
-    let qaWeaponIndex=-1;
+    let qaWeaponIndex=-1,qaDirectionIndex=-1;
     panel.classList.remove("hidden");document.documentElement.dataset.qaMode="enabled";
     biomeSelect.innerHTML=BIOMES.map((b,i)=>`<option value="${i}">${i+1}. ${b.name}</option>`).join("");
     const ensureExpedition=()=>{const biome=Number(biomeSelect.value)||0,depth=clamp(Number(depthSelect.value)||1,1,5);if(game.scene!=="expedition"||game.biome!==biome||game.depth!==depth)enterFloor(biome,depth);game.save.player.hp=stats().maxHp;game.player.statuses={};game.player.invuln=60;$("death-panel").classList.add("hidden");game.paused=false;return{biome,depth};};
     const qaItem=(slot,index,region=0)=>{const weaponType=WEAPON_TYPES[index%WEAPON_TYPES.length],item=generateItem(region,5,Math.min(4,index%5),new RNG(`qa-${slot}-${index}-${region}`));item.id=`qa-${slot}-${index}-${region}`;item.slot=slot;item.region=region;item.enhance=index%10;item.quality=QUALITIES[index%QUALITIES.length].id;if(slot==="weapon"){item.weaponType=weaponType;item.name=`验收${WEAPON_NAMES[weaponType]}`;item.main={type:"attack",value:28+region*8+index};}else{item.name=`验收${SLOT_NAMES[slot]} ${index+1}`;item.main={type:slot==="amulet"?"maxHp":"defense",value:slot==="amulet"?55+index:14+region*4+index};}return item;};
-    const updateQaStatus=()=>{const living=game.enemies.filter(e=>!e.dead).length,exit=game.world?.exit,exitDistance=exit?Math.round(Math.hypot((exit.x+.5)*TILE-game.player.x,(exit.y+.5)*TILE-game.player.y)):null,status=`${game.scene==="expedition"?`${game.biome+1}-${game.depth}`:game.scene} · 敌${living} · 弹${game.projectiles.length} · 预警${game.telegraphs.length} · 特效${game.impacts.length}`;$("qa-status").textContent=status;document.documentElement.dataset.qaSnapshot=JSON.stringify({scene:game.scene,biome:game.biome,depth:game.depth,living,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length,drops:game.groundDrops.length,inventory:game.save.equipment.inventory.length,visual:document.documentElement.dataset.playerVisual||"",exitDistance,exitLocked:game.world?.exitLocked??null});};
+    const updateQaStatus=()=>{const living=game.enemies.filter(e=>!e.dead).length,exit=game.world?.exit,exitDistance=exit?Math.round(Math.hypot((exit.x+.5)*TILE-game.player.x,(exit.y+.5)*TILE-game.player.y)):null,status=`${game.scene==="expedition"?`${game.biome+1}-${game.depth}`:game.scene} · 敌${living} · 弹${game.projectiles.length} · 预警${game.telegraphs.length} · 特效${game.impacts.length}`,inventory=game.save.equipment.inventory.length,materials=Object.values(game.save.materials).reduce((sum,value)=>sum+(Number(value)||0),0),last=document.documentElement.dataset.qaLast||"ready",openPanel=[...document.querySelectorAll(".overlay:not(.hidden)")].map(node=>node.id).filter(Boolean).join(",")||"none",bgm=`${document.documentElement.dataset.bgmKey||game.musicTheme||"none"}:${document.documentElement.dataset.bgmState||"idle"}`;$("qa-status").textContent=status;const snapshot={scene:game.scene,biome:game.biome,depth:game.depth,living,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length,drops:game.groundDrops.length,inventory,inventoryTab:game.inventoryTab,forgeRegion:Number(game.selectedForge),materials,gold:game.save.currencies.gold,void:game.save.currencies.void,potions:game.save.player.potions,visual:document.documentElement.dataset.playerVisual||"",weaponMount:document.documentElement.dataset.weaponMount||"none",openPanel,last,bgm,exitDistance,exitLocked:game.world?.exitLocked??null};document.documentElement.dataset.qaSnapshot=JSON.stringify(snapshot);document.title=`像素纪元：五域远征 | QA scene=${game.scene} inv=${inventory} g=${snapshot.gold} mat=${materials} pot=${snapshot.potions} tab=${game.inventoryTab} panel=${openPanel} forge=${snapshot.forgeRegion} bgm=${bgm} last=${last}`;};
+    game.qaUpdateStatus=updateQaStatus;
     $("qa-enter").onclick=()=>{const {biome,depth}=ensureExpedition();document.documentElement.dataset.qaLast=`stage:${biome}:${depth}`;updateQaStatus();};
     $("qa-loadout").onclick=()=>{
-      if(game.scene==="title")startNewGame();game.save.progress.unlocked=[0,1,2,3,4];Object.keys(game.save.materials).forEach(key=>game.save.materials[key]=99);game.save.currencies.gold=99999;game.save.currencies.void=99;game.save.player.skillPoints=12;
+      if(game.scene==="title")startNewGame();game.save.progress.unlocked=[0,1,2,3,4];game.save.progress.completedDepths=[5,4,3,2,1];Object.keys(game.save.materials).forEach(key=>game.save.materials[key]=99);game.save.currencies.gold=99999;game.save.currencies.void=99;game.save.player.skillPoints=12;
       const slots=Object.keys(SLOT_NAMES),region=Number(biomeSelect.value)||0;game.save.equipment.equipped={weapon:qaItem("weapon",4,region),helmet:qaItem("helmet",4,region),armor:qaItem("armor",4,region),boots:qaItem("boots",4,region),amulet:qaItem("amulet",4,region)};game.save.equipment.inventory=Array.from({length:68},(_,i)=>qaItem(slots[i%slots.length],i, i%5));game.visualEquipmentSignature="";game.unseenItems=game.save.equipment.inventory.length;game.save.player.hp=stats().maxHp;updateHUD();if(!$("character-panel").classList.contains("hidden"))renderCharacterPanel();document.documentElement.dataset.qaLast="loadout";updateQaStatus();toast("验收装备、五品质背包和全部材料已就绪","#a5f0ce");
     };
-    $("qa-mob-fx").onclick=()=>{ensureExpedition();game.enemies=[];game.projectiles=[];game.telegraphs=[];game.impacts=[];game.player.invuln=60;const attacks=[];for(let i=0;i<4;i++){const angle=i/4*Math.PI*2;spawnEnemy(i,game.player.x+Math.cos(angle)*60,game.player.y+Math.sin(angle)*60,false);const e=game.enemies[game.enemies.length-1];if(i===0&&!e.elite){e.elite=true;e.name=`精英·${e.name}`;e.hp=e.maxHp=Math.round(e.maxHp*1.75);}e.pendingAttack=e.attack.id;e.targetX=game.player.x;e.targetY=game.player.y;performEnemyAttack(e);attacks.push(e.attack.id);}document.documentElement.dataset.qaLastEffect=JSON.stringify({kind:"mobs",biome:game.biome,attacks,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length});updateQaStatus();};
-    $("qa-boss-fx").onclick=()=>{ensureExpedition();game.projectiles=[];game.telegraphs=[];game.impacts=[];let boss=game.enemies.find(e=>e.boss&&!e.dead);game.enemies=game.enemies.filter(e=>e===boss);if(!boss){spawnEnemy(0,game.player.x+150,game.player.y,true);boss=game.enemies[game.enemies.length-1];}const pattern=boss.pattern%4;game.player.invuln=60;bossSpecial(boss);document.documentElement.dataset.qaLastEffect=JSON.stringify({kind:"boss",biome:game.biome,pattern,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length});updateQaStatus();};
+    $("qa-full-save").onclick=installFullUnlockTestSave;
+    $("qa-mob-fx").onclick=()=>{ensureExpedition();game.enemies=[];game.projectiles=[];game.telegraphs=[];game.impacts=[];game.player.invuln=60;const attacks=[];for(let i=0;i<4;i++){const angle=i/4*Math.PI*2;spawnEnemy(i,game.player.x+Math.cos(angle)*60,game.player.y+Math.sin(angle)*60,false);const e=game.enemies[game.enemies.length-1];if(i===0&&!e.elite){e.elite=true;e.name=`精英·${e.name}`;e.hp=e.maxHp=Math.round(e.maxHp*1.75);}e.pendingAttack=e.attack.id;e.targetX=game.player.x;e.targetY=game.player.y;performEnemyAttack(e);attacks.push(e.attack.id);}const report={kind:"mobs",biome:game.biome,attacks,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length};document.documentElement.dataset.qaLastEffect=JSON.stringify(report);document.documentElement.dataset.qaLast=`mobs:b${game.biome}:a${attacks.length}:pr${report.projectiles}:tg${report.telegraphs}:im${report.impacts}`;updateQaStatus();};
+    $("qa-boss-fx").onclick=()=>{ensureExpedition();game.projectiles=[];game.telegraphs=[];game.impacts=[];let boss=game.enemies.find(e=>e.boss&&!e.dead);game.enemies=game.enemies.filter(e=>e===boss);if(!boss){spawnEnemy(0,game.player.x+120,game.player.y,true);boss=game.enemies[game.enemies.length-1];}boss.x=game.player.x+120;boss.y=game.player.y;boss.vx=boss.vy=0;boss.state="idle";boss.stateTime=0;boss.specialCd=999;boss.hp=boss.maxHp;const pattern=boss.pattern%4;game.player.invuln=60;bossSpecial(boss);const report={kind:"boss",biome:game.biome,pattern,projectiles:game.projectiles.length,telegraphs:game.telegraphs.length,impacts:game.impacts.length,boundProjectiles:game.projectiles.filter(q=>q.monsterFx).length,boundTelegraphs:game.telegraphs.filter(t=>t.monsterFx).length,boundImpacts:game.impacts.filter(f=>f.monsterFx).length,telegraphTypes:game.telegraphs.map(t=>t.type)};document.documentElement.dataset.qaLastEffect=JSON.stringify(report);document.documentElement.dataset.qaLast=`boss:b${report.biome}:p${report.pattern}:fx${report.boundProjectiles+report.boundTelegraphs+report.boundImpacts}:pr${report.projectiles}:tg${report.telegraphs}:im${report.impacts}`;updateQaStatus();};
     $("qa-drops").onclick=()=>{ensureExpedition();const b=BIOMES[game.biome],p=game.player;game.groundDrops=[];spawnGroundDrop("equipment",p.x-18,p.y,{item:qaItem("weapon",game.biome,game.biome)});spawnGroundDrop("material",p.x,p.y-18,{material:b.rare,amount:2});spawnGroundDrop("potion",p.x+18,p.y);document.documentElement.dataset.qaLast="drops";updateQaStatus();};
-    $("qa-actions").onclick=()=>{ensureExpedition();const report={walk:[],run:[],attack:[],hurt:[]},sample=key=>report[key].push(document.documentElement.dataset.playerVisual||""),moves=[{code:"KeyD",dx:1,dy:0},{code:"KeyA",dx:-1,dy:0},{code:"KeyS",dx:0,dy:1},{code:"KeyW",dx:0,dy:-1}];let move=moves[0];if(game.world){const s=game.world.start;game.player.x=(s.x+.5)*TILE;game.player.y=(s.y+.5)*TILE;move=moves.find(m=>game.world.tiles[s.y+m.dy]?.[s.x+m.dx]!==0)||move;}game.player.vx=game.player.vy=0;setPlayerAim(move.dx,move.dy);game.player.invuln=0;game.player.swing=null;game.player.runKey=null;game.keys.add(move.code);let elapsed=0;const timer=setInterval(()=>{elapsed+=60;if(elapsed<=480)sample("walk");else if(elapsed===540){game.player.runKey=move.code;game.player.runUntil=performance.now()+900;}else if(elapsed<=1020)sample("run");else if(elapsed===1080){game.keys.delete(move.code);game.player.running=false;game.player.attackCd=0;attack(true);syncLayeredPlayerVisual(0);sample("attack");}else if(elapsed<=1440)sample("attack");else if(elapsed===1500){game.player.invuln=0;damagePlayer(Math.max(8,stats().maxHp*.12),game.player.x-50,game.player.y);}else if(elapsed<=1800)sample("hurt");else{clearInterval(timer);game.keys.delete(move.code);document.documentElement.dataset.qaActionReport=JSON.stringify(report);document.documentElement.dataset.qaLast="actions-complete";updateQaStatus();}},60);};
+    $("qa-actions").onclick=()=>{ensureExpedition();const report={walk:[],run:[],attack:[],hurt:[]},sample=key=>report[key].push({visual:document.documentElement.dataset.playerVisual||"",mount:document.documentElement.dataset.weaponMount||"none"}),moves=[{code:"KeyD",dx:1,dy:0},{code:"KeyA",dx:-1,dy:0},{code:"KeyS",dx:0,dy:1},{code:"KeyW",dx:0,dy:-1}];let move=moves[0];if(game.world){const s=game.world.start;game.player.x=(s.x+.5)*TILE;game.player.y=(s.y+.5)*TILE;move=moves.find(m=>game.world.tiles[s.y+m.dy]?.[s.x+m.dx]!==0)||move;}game.player.vx=game.player.vy=0;setPlayerAim(move.dx,move.dy);game.player.invuln=0;game.player.swing=null;game.player.weaponDrawn=0;game.player.runKey=null;game.keys.add(move.code);let elapsed=0;const timer=setInterval(()=>{elapsed+=60;if(elapsed<=480)sample("walk");else if(elapsed===540){game.player.runKey=move.code;game.player.runUntil=performance.now()+900;}else if(elapsed<=1020)sample("run");else if(elapsed===1080){game.keys.delete(move.code);game.player.running=false;game.player.attackCd=0;attack();syncLayeredPlayerVisual(0);sample("attack");}else if(elapsed<=1440)sample("attack");else if(elapsed===1500){game.player.invuln=0;damagePlayer(Math.max(8,stats().maxHp*.12),game.player.x-50,game.player.y);}else if(elapsed<=1800)sample("hurt");else{clearInterval(timer);game.keys.delete(move.code);document.documentElement.dataset.qaActionReport=JSON.stringify(report);document.documentElement.dataset.qaLast="actions-complete";updateQaStatus();}},60);};
     $("qa-weapon").onclick=()=>{ensureExpedition();qaWeaponIndex=(qaWeaponIndex+1)%WEAPON_TYPES.length;const type=WEAPON_TYPES[qaWeaponIndex],item=qaItem("weapon",qaWeaponIndex,game.biome);item.weaponType=type;item.name=`验收${WEAPON_NAMES[type]}`;game.save.equipment.equipped.weapon=item;game.visualEquipmentSignature="";game.enemies=[];game.projectiles=[];game.telegraphs=[];game.impacts=[];spawnEnemy(0,game.player.x+60,game.player.y,false);game.player.attackCd=0;game.player.activeCd1=0;game.player.activeCd2=0;game.save.player.stamina=100;setPlayerAim(1,0);syncVisualEquipment();document.documentElement.dataset.qaLast=`weapon:${type}`;updateQaStatus();};
+    $("qa-combos").onclick=()=>{ensureExpedition();game.enemies=[];game.projectiles=[];game.impacts=[];spawnEnemy(0,game.player.x+52,game.player.y,false);const target=game.enemies[game.enemies.length-1];target.hp=target.maxHp=1e8;target.speed=0;target.attackCd=999;const report=[],total=WEAPON_TYPES.length*3;let step=0;const timer=setInterval(()=>{if(step>=total){clearInterval(timer);document.documentElement.dataset.qaComboReport=JSON.stringify(report);document.documentElement.dataset.qaLast=`combos-complete:${report.length}`;updateQaStatus();return;}const weaponIndex=Math.floor(step/3),combo=step%3+1,type=WEAPON_TYPES[weaponIndex],item=qaItem("weapon",weaponIndex,game.biome);item.weaponType=type;game.save.equipment.equipped.weapon=item;game.visualEquipmentSignature="";game.player.swing=null;game.player.dash=0;game.player.attackCd=0;game.player.combo=combo-1;game.player.comboUntil=performance.now()/1000+1;game.player.aimTarget=target;game.player.aimLockUntil=performance.now()+1000;setPlayerAim(target.x-game.player.x,target.y-game.player.y);syncVisualEquipment();attack();report.push({type,combo,fx:game.player.swing?.comboFx||null,autoAim:document.documentElement.dataset.autoAimTarget||"none"});document.documentElement.dataset.qaLast=`combo:${type}:${combo}`;updateQaStatus();step++;},720);};
+    $("qa-axe-spin").onclick=()=>{ensureExpedition();game.enemies=[];game.projectiles=[];game.impacts=[];spawnEnemy(0,game.player.x+62,game.player.y,false);const target=game.enemies[game.enemies.length-1],item=qaItem("weapon",2,game.biome);target.hp=target.maxHp=1e8;target.speed=0;target.attackCd=999;item.weaponType="axe";game.save.equipment.equipped.weapon=item;game.visualEquipmentSignature="";game.player.swing=null;game.player.dash=0;game.player.attackCd=0;game.player.combo=2;game.player.comboUntil=performance.now()/1000+1;game.player.aimTarget=target;game.player.aimLockUntil=performance.now()+1200;setPlayerAim(1,0);syncVisualEquipment();attack();document.documentElement.dataset.qaLast="axe-spin";updateQaStatus();};
+    $("qa-direction").onclick=()=>{ensureExpedition();const dirs=[{name:"right",x:1,y:0},{name:"down",x:0,y:1},{name:"left",x:-1,y:0},{name:"up",x:0,y:-1}],dir=dirs[qaDirectionIndex=(qaDirectionIndex+1)%dirs.length];game.player.vx=game.player.vy=0;game.player.swing=null;setPlayerAim(dir.x,dir.y);syncLayeredPlayerVisual(0);document.documentElement.dataset.qaLast=`direction:${dir.name}`;updateQaStatus();};
     $("qa-hurt").onclick=()=>{ensureExpedition();game.player.invuln=0;damagePlayer(Math.max(8,stats().maxHp*.12),game.player.x-50,game.player.y);document.documentElement.dataset.qaLast="hurt";updateQaStatus();};
     $("qa-clear").onclick=()=>{ensureExpedition();const living=game.enemies.filter(e=>!e.dead);if(!living.length&&game.world?.exit&&!game.world.exitLocked){const before=`${game.biome}:${game.depth}`,exit=game.world.exit;game.groundDrops=[];game.player.x=(exit.x+.5)*TILE;game.player.y=(exit.y+.5)*TILE;interact();document.documentElement.dataset.qaLast=`portal:${before}->${game.scene}:${game.biome}:${game.depth}`;updateQaStatus();return;}game.projectiles=[];game.telegraphs=[];game.player.statuses={};game.player.invuln=60;living.slice().forEach(killEnemy);document.documentElement.dataset.qaLast=`clear:${Boolean(game.world?.exitSpawned)}`;updateQaStatus();};
     setInterval(updateQaStatus,300);updateQaStatus();
@@ -1737,7 +2050,7 @@
     }
     addEventListener("resize",resizeShell);resizeShell();
     if(matchMedia("(pointer: coarse)").matches)$("mobile-controls").classList.remove("hidden");
-    setupEvents();setupQaHarness();$("new-game-btn").disabled=false;updateTitleSaveMeta();updateHUD();requestAnimationFrame(loop);
+    setupEvents();ensureFullUnlockTestSlot();setupQaHarness();$("new-game-btn").disabled=false;updateTitleSaveMeta();updateHUD();requestAnimationFrame(loop);
   }
 
   bootGame();

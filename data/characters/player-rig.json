@@ -78,50 +78,55 @@
   "anchors": {
     "default": {
       "right": {
-        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 12, "y": -38 },
         "leftHandAnchor": { "x": -11, "y": -23 }, "rightHandAnchor": { "x": 15, "y": -23 },
         "backAnchor": { "x": -10, "y": -29 }, "leftFootAnchor": { "x": -8, "y": 8 }, "rightFootAnchor": { "x": 8, "y": 8 }
       },
       "down": {
-        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 6, "y": -38 },
         "leftHandAnchor": { "x": -9, "y": -19 }, "rightHandAnchor": { "x": 9, "y": -19 },
         "backAnchor": { "x": 0, "y": -29 }, "leftFootAnchor": { "x": -8, "y": 8 }, "rightFootAnchor": { "x": 8, "y": 8 }
       },
       "left": {
-        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": -6, "y": -38 },
         "leftHandAnchor": { "x": 11, "y": -23 }, "rightHandAnchor": { "x": -15, "y": -23 },
         "backAnchor": { "x": 10, "y": -29 }, "leftFootAnchor": { "x": -8, "y": 8 }, "rightFootAnchor": { "x": 8, "y": 8 }
       },
       "up": {
-        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": 0, "y": -48 },
+        "bodyAnchor": { "x": 0, "y": -22 }, "headAnchor": { "x": -8, "y": -38 },
         "leftHandAnchor": { "x": -7, "y": -27 }, "rightHandAnchor": { "x": 7, "y": -27 },
         "backAnchor": { "x": 0, "y": -30 }, "leftFootAnchor": { "x": -7, "y": 8 }, "rightFootAnchor": { "x": 7, "y": 8 }
       }
     },
     "animations": {
-      "idle": { "frames": [{ "all": {} }] },
+      "idle": { "frames": [{
+        "right": { "rightHandAnchor": { "x": 3, "y": 7 } },
+        "down": { "rightHandAnchor": { "x": 3, "y": 6 } },
+        "left": { "rightHandAnchor": { "x": -3, "y": 7 } },
+        "up": { "rightHandAnchor": { "x": 0, "y": 8 } }
+      }] },
       "walk": {
         "frames": [
-          { "all": { "bodyAnchor": { "y": 1 }, "headAnchor": { "y": 1 }, "backAnchor": { "y": 1 }, "leftHandAnchor": { "y": 1 }, "rightHandAnchor": { "y": -1 } }, "right": { "leftFootAnchor": { "x": -2 }, "rightFootAnchor": { "x": 2 } }, "left": { "leftFootAnchor": { "x": 2 }, "rightFootAnchor": { "x": -2 } }, "down": { "leftFootAnchor": { "y": -2 }, "rightFootAnchor": { "y": 2 } }, "up": { "leftFootAnchor": { "y": 2 }, "rightFootAnchor": { "y": -2 } } },
-          { "all": { "bodyAnchor": { "y": -1 }, "headAnchor": { "y": -1 }, "backAnchor": { "y": -1 }, "leftHandAnchor": { "y": -1 }, "rightHandAnchor": { "y": 1 } }, "right": { "leftFootAnchor": { "x": 2 }, "rightFootAnchor": { "x": -2 } }, "left": { "leftFootAnchor": { "x": -2 }, "rightFootAnchor": { "x": 2 } }, "down": { "leftFootAnchor": { "y": 2 }, "rightFootAnchor": { "y": -2 } }, "up": { "leftFootAnchor": { "y": -2 }, "rightFootAnchor": { "y": 2 } } }
+          { "all": { "bodyAnchor": { "y": 1 }, "backAnchor": { "y": 1 }, "leftHandAnchor": { "y": 1 } }, "right": { "headAnchor": { "x": -5, "y": -4 }, "rightHandAnchor": { "x": -14, "y": 17 }, "leftFootAnchor": { "x": -2 }, "rightFootAnchor": { "x": 2 } }, "down": { "headAnchor": { "x": -6, "y": -4 }, "rightHandAnchor": { "x": -1, "y": 18 }, "leftFootAnchor": { "y": -2 }, "rightFootAnchor": { "y": 2 } }, "left": { "headAnchor": { "x": 0, "y": -4 }, "rightHandAnchor": { "x": 15, "y": 16 }, "leftFootAnchor": { "x": 2 }, "rightFootAnchor": { "x": -2 } }, "up": { "headAnchor": { "x": 10, "y": -4 }, "rightHandAnchor": { "x": 4, "y": 26 }, "leftFootAnchor": { "y": 2 }, "rightFootAnchor": { "y": -2 } } },
+          { "all": { "bodyAnchor": { "y": -1 }, "backAnchor": { "y": -1 }, "leftHandAnchor": { "y": -1 } }, "right": { "headAnchor": { "x": -5, "y": -16 }, "rightHandAnchor": { "x": 5, "y": 25 }, "leftFootAnchor": { "x": 2 }, "rightFootAnchor": { "x": -2 } }, "down": { "headAnchor": { "x": -7, "y": -16 }, "rightHandAnchor": { "x": 0, "y": 0 }, "leftFootAnchor": { "y": 2 }, "rightFootAnchor": { "y": -2 } }, "left": { "headAnchor": { "x": 0, "y": -16 }, "rightHandAnchor": { "x": -1, "y": 4 }, "leftFootAnchor": { "x": -2 }, "rightFootAnchor": { "x": 2 } }, "up": { "headAnchor": { "x": 10, "y": -16 }, "rightHandAnchor": { "x": 5, "y": 8 }, "leftFootAnchor": { "y": -2 }, "rightFootAnchor": { "y": 2 } } }
         ]
       },
       "run": {
         "frames": [
-          { "all": { "bodyAnchor": { "y": 0 }, "headAnchor": { "y": 0 }, "leftHandAnchor": { "x": -2 }, "rightHandAnchor": { "x": 2 } } },
-          { "all": { "bodyAnchor": { "y": -2 }, "headAnchor": { "y": -2 }, "leftHandAnchor": { "y": 2 }, "rightHandAnchor": { "y": -2 }, "leftFootAnchor": { "y": -3 }, "rightFootAnchor": { "y": 3 } } },
-          { "all": { "bodyAnchor": { "y": 0 }, "headAnchor": { "y": 0 }, "leftHandAnchor": { "x": 2 }, "rightHandAnchor": { "x": -2 } } },
-          { "all": { "bodyAnchor": { "y": 2 }, "headAnchor": { "y": 2 }, "leftHandAnchor": { "y": -2 }, "rightHandAnchor": { "y": 2 }, "leftFootAnchor": { "y": 3 }, "rightFootAnchor": { "y": -3 } } }
+          { "all": { "bodyAnchor": { "y": 0 }, "leftHandAnchor": { "x": -2 } }, "right": { "headAnchor": { "x": -1, "y": -4 }, "rightHandAnchor": { "x": 6, "y": 4 } }, "down": { "headAnchor": { "x": -5, "y": -4 }, "rightHandAnchor": { "x": 1, "y": 5 } }, "left": { "headAnchor": { "x": -7, "y": -4 }, "rightHandAnchor": { "x": -6, "y": 6 } }, "up": { "headAnchor": { "x": 6, "y": -4 }, "rightHandAnchor": { "x": 1, "y": 15 } } },
+          { "all": { "bodyAnchor": { "y": -2 }, "leftHandAnchor": { "y": 2 }, "leftFootAnchor": { "y": -3 }, "rightFootAnchor": { "y": 3 } }, "right": { "headAnchor": { "x": -5, "y": -9 }, "rightHandAnchor": { "x": -1, "y": -2 } }, "down": { "headAnchor": { "x": -6, "y": -9 }, "rightHandAnchor": { "x": -2, "y": -1 } }, "left": { "headAnchor": { "x": -6, "y": -9 }, "rightHandAnchor": { "x": -3, "y": -1 } }, "up": { "headAnchor": { "x": 6, "y": -9 }, "rightHandAnchor": { "x": 0, "y": 7 } } },
+          { "all": { "bodyAnchor": { "y": 0 }, "leftHandAnchor": { "x": 2 } }, "right": { "headAnchor": { "x": -15, "y": -7 }, "rightHandAnchor": { "x": 1, "y": 0 } }, "down": { "headAnchor": { "x": -6, "y": -7 }, "rightHandAnchor": { "x": 1, "y": 3 } }, "left": { "headAnchor": { "x": 7, "y": -7 }, "rightHandAnchor": { "x": 0, "y": 4 } }, "up": { "headAnchor": { "x": 6, "y": -7 }, "rightHandAnchor": { "x": 4, "y": 11 } } },
+          { "all": { "bodyAnchor": { "y": 2 }, "leftHandAnchor": { "y": -2 }, "leftFootAnchor": { "y": 3 }, "rightFootAnchor": { "y": -3 } }, "right": { "headAnchor": { "x": -12, "y": -13 }, "rightHandAnchor": { "x": 8, "y": -8 } }, "down": { "headAnchor": { "x": -6, "y": -13 }, "rightHandAnchor": { "x": 1, "y": -3 } }, "left": { "headAnchor": { "x": 1, "y": -13 }, "rightHandAnchor": { "x": -8, "y": 18 } }, "up": { "headAnchor": { "x": 6, "y": -13 }, "rightHandAnchor": { "x": 1, "y": 6 } } }
         ]
       },
       "attack": {
         "frames": [
-          { "right": { "rightHandAnchor": { "x": -4, "y": -3 } }, "left": { "rightHandAnchor": { "x": 4, "y": -3 } }, "down": { "rightHandAnchor": { "x": -3, "y": -4 } }, "up": { "rightHandAnchor": { "x": 3, "y": 2 } } },
-          { "right": { "rightHandAnchor": { "x": 7, "y": 2 } }, "left": { "rightHandAnchor": { "x": -7, "y": 2 } }, "down": { "rightHandAnchor": { "x": 2, "y": 7 } }, "up": { "rightHandAnchor": { "x": -2, "y": -7 } } },
-          { "all": { "bodyAnchor": { "y": 1 }, "headAnchor": { "y": 1 } } }
+          { "right": { "headAnchor": { "x": 2, "y": -5 }, "rightHandAnchor": { "x": 15, "y": 5 } }, "left": { "headAnchor": { "x": -8, "y": -5 }, "rightHandAnchor": { "x": -11, "y": 5 } }, "down": { "headAnchor": { "x": -1, "y": -5 }, "rightHandAnchor": { "x": 8, "y": 5 } }, "up": { "headAnchor": { "x": 1, "y": -5 }, "rightHandAnchor": { "x": 11, "y": 17 } } },
+          { "right": { "headAnchor": { "x": -8, "y": -11 }, "rightHandAnchor": { "x": 17, "y": 2 } }, "left": { "headAnchor": { "x": 3, "y": -11 }, "rightHandAnchor": { "x": -17, "y": -3 } }, "down": { "headAnchor": { "x": 0, "y": -11 }, "rightHandAnchor": { "x": 0, "y": 7 } }, "up": { "headAnchor": { "x": 2, "y": -11 }, "rightHandAnchor": { "x": 5, "y": -21 } } },
+          { "all": { "bodyAnchor": { "y": 1 } }, "right": { "headAnchor": { "x": 0, "y": -14 }, "rightHandAnchor": { "x": -5, "y": 14 } }, "down": { "headAnchor": { "x": 1, "y": -14 }, "rightHandAnchor": { "x": 9, "y": 13 } }, "left": { "headAnchor": { "x": 5, "y": -14 }, "rightHandAnchor": { "x": 4, "y": 15 } }, "up": { "headAnchor": { "x": 1, "y": -14 }, "rightHandAnchor": { "x": 6, "y": 20 } } }
         ]
       },
-      "hurt": { "frames": [{ "all": { "bodyAnchor": { "y": 3 }, "headAnchor": { "y": 3 }, "leftHandAnchor": { "y": 3 }, "rightHandAnchor": { "y": 3 } } }] }
+      "hurt": { "frames": [{ "all": { "bodyAnchor": { "y": 3 }, "leftHandAnchor": { "y": 3 } }, "right": { "headAnchor": { "x": 0, "y": -14 }, "rightHandAnchor": { "x": -5, "y": 16 } }, "down": { "headAnchor": { "x": 1, "y": -14 }, "rightHandAnchor": { "x": 9, "y": 15 } }, "left": { "headAnchor": { "x": 5, "y": -14 }, "rightHandAnchor": { "x": 4, "y": 17 } }, "up": { "headAnchor": { "x": 1, "y": -14 }, "rightHandAnchor": { "x": 6, "y": 22 } } }] }
     }
   }
 }

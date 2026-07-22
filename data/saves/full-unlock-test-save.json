@@ -1,0 +1,168 @@
+{
+  "version": 4,
+  "savedAt": 0,
+  "metadata": {
+    "id": "full-unlock-test-save",
+    "name": "全解锁测试档",
+    "description": "五域 25 层全通关、五把传说武器、全材料 999、药水 99。",
+    "targetSlot": 3
+  },
+  "save": {
+    "version": "1.0.0",
+    "playtime": 0,
+    "player": {
+      "level": 50,
+      "xp": 0,
+      "hp": 9999,
+      "stamina": 100,
+      "skillPoints": 99,
+      "potions": 99
+    },
+    "skills": {
+      "fury": { "blade": 3, "weakness": 3, "finisher": 1 },
+      "survival": { "toughness": 3, "agility": 3, "renewal": 1 },
+      "explore": { "haste": 3, "miner": 3, "alchemy": 1 }
+    },
+    "equipment": {
+      "equipped": {
+        "weapon": {
+          "id": "test-legendary-sword",
+          "name": "星火试炼长剑",
+          "slot": "weapon",
+          "quality": "gold",
+          "level": 50,
+          "enhance": 15,
+          "weaponType": "sword",
+          "region": 0,
+          "main": { "type": "attack", "value": 108 },
+          "affixes": [
+            { "type": "critRate", "name": "暴击率", "value": 0.09, "suffix": "%", "special": false },
+            { "type": "attackSpeed", "name": "攻击速度", "value": 0.14, "suffix": "%", "special": false },
+            { "type": "elementalDamage", "name": "元素增伤", "value": 0.22, "suffix": "%", "special": true },
+            { "type": "eliteDamage", "name": "精英增伤", "value": 0.25, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "bloodblade", "name": "嗜血之刃", "text": "每次攻击命中额外恢复伤害 5% 的生命值" },
+          "lore": "全解锁验收档专用传说武器。"
+        },
+        "helmet": {
+          "id": "test-legendary-helmet", "name": "星火试炼面甲", "slot": "helmet", "quality": "gold", "level": 50, "enhance": 15, "region": 4,
+          "main": { "type": "defense", "value": 58 },
+          "affixes": [
+            { "type": "maxHp", "name": "最大生命", "value": 90, "suffix": "", "special": false },
+            { "type": "reduction", "name": "伤害减免", "value": 0.08, "suffix": "%", "special": false },
+            { "type": "rareFind", "name": "稀有寻获", "value": 0.2, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "bloodblade", "name": "嗜血之刃", "text": "每次攻击命中额外恢复伤害 5% 的生命值" },
+          "lore": "全解锁验收档专用装备。"
+        },
+        "armor": {
+          "id": "test-legendary-armor", "name": "星火试炼战铠", "slot": "armor", "quality": "gold", "level": 50, "enhance": 15, "region": 4,
+          "main": { "type": "defense", "value": 94 },
+          "affixes": [
+            { "type": "maxHp", "name": "最大生命", "value": 90, "suffix": "", "special": false },
+            { "type": "reduction", "name": "伤害减免", "value": 0.08, "suffix": "%", "special": false },
+            { "type": "rareFind", "name": "稀有寻获", "value": 0.2, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "thunderarmor", "name": "雷霆铠甲", "text": "受击时有 20% 概率反击周围敌人" },
+          "lore": "全解锁验收档专用装备。"
+        },
+        "boots": {
+          "id": "test-legendary-boots", "name": "星火试炼战靴", "slot": "boots", "quality": "gold", "level": 50, "enhance": 15, "region": 4,
+          "main": { "type": "defense", "value": 52 },
+          "affixes": [
+            { "type": "maxHp", "name": "最大生命", "value": 90, "suffix": "", "special": false },
+            { "type": "reduction", "name": "伤害减免", "value": 0.08, "suffix": "%", "special": false },
+            { "type": "rareFind", "name": "稀有寻获", "value": 0.2, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "starstep", "name": "星界足迹", "text": "闪避结束时对附近敌人造成攻击力 80% 伤害" },
+          "lore": "全解锁验收档专用装备。"
+        },
+        "amulet": {
+          "id": "test-legendary-amulet", "name": "星火试炼星坠", "slot": "amulet", "quality": "gold", "level": 50, "enhance": 15, "region": 4,
+          "main": { "type": "maxHp", "value": 260 },
+          "affixes": [
+            { "type": "maxHp", "name": "最大生命", "value": 90, "suffix": "", "special": false },
+            { "type": "reduction", "name": "伤害减免", "value": 0.08, "suffix": "%", "special": false },
+            { "type": "rareFind", "name": "稀有寻获", "value": 0.2, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "voidheart", "name": "虚空之心", "text": "生命低于 30% 时造成伤害提高 25%" },
+          "lore": "全解锁验收档专用装备。"
+        }
+      },
+      "inventory": [
+        {
+          "id": "test-legendary-spear", "name": "星火试炼长枪", "slot": "weapon", "quality": "gold", "level": 50, "enhance": 15, "weaponType": "spear", "region": 1,
+          "main": { "type": "attack", "value": 122 },
+          "affixes": [
+            { "type": "critRate", "name": "暴击率", "value": 0.09, "suffix": "%", "special": false },
+            { "type": "attackSpeed", "name": "攻击速度", "value": 0.14, "suffix": "%", "special": false },
+            { "type": "elementalDamage", "name": "元素增伤", "value": 0.22, "suffix": "%", "special": true },
+            { "type": "eliteDamage", "name": "精英增伤", "value": 0.25, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "thunderarmor", "name": "雷霆铠甲", "text": "受击时有 20% 概率反击周围敌人" }, "lore": "全解锁验收档专用传说武器。"
+        },
+        {
+          "id": "test-legendary-axe", "name": "星火试炼战斧", "slot": "weapon", "quality": "gold", "level": 50, "enhance": 15, "weaponType": "axe", "region": 2,
+          "main": { "type": "attack", "value": 136 },
+          "affixes": [
+            { "type": "critRate", "name": "暴击率", "value": 0.09, "suffix": "%", "special": false },
+            { "type": "attackSpeed", "name": "攻击速度", "value": 0.14, "suffix": "%", "special": false },
+            { "type": "elementalDamage", "name": "元素增伤", "value": 0.22, "suffix": "%", "special": true },
+            { "type": "eliteDamage", "name": "精英增伤", "value": 0.25, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "starstep", "name": "星界足迹", "text": "闪避结束时对附近敌人造成攻击力 80% 伤害" }, "lore": "全解锁验收档专用传说武器。"
+        },
+        {
+          "id": "test-legendary-staff", "name": "星火试炼星杖", "slot": "weapon", "quality": "gold", "level": 50, "enhance": 15, "weaponType": "staff", "region": 3,
+          "main": { "type": "attack", "value": 150 },
+          "affixes": [
+            { "type": "critRate", "name": "暴击率", "value": 0.09, "suffix": "%", "special": false },
+            { "type": "attackSpeed", "name": "攻击速度", "value": 0.14, "suffix": "%", "special": false },
+            { "type": "elementalDamage", "name": "元素增伤", "value": 0.22, "suffix": "%", "special": true },
+            { "type": "eliteDamage", "name": "精英增伤", "value": 0.25, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "voidheart", "name": "虚空之心", "text": "生命低于 30% 时造成伤害提高 25%" }, "lore": "全解锁验收档专用传说武器。"
+        },
+        {
+          "id": "test-legendary-daggers", "name": "星火试炼双刃", "slot": "weapon", "quality": "gold", "level": 50, "enhance": 15, "weaponType": "daggers", "region": 4,
+          "main": { "type": "attack", "value": 164 },
+          "affixes": [
+            { "type": "critRate", "name": "暴击率", "value": 0.09, "suffix": "%", "special": false },
+            { "type": "attackSpeed", "name": "攻击速度", "value": 0.14, "suffix": "%", "special": false },
+            { "type": "elementalDamage", "name": "元素增伤", "value": 0.22, "suffix": "%", "special": true },
+            { "type": "eliteDamage", "name": "精英增伤", "value": 0.25, "suffix": "%", "special": true }
+          ],
+          "legendary": { "id": "bloodblade", "name": "嗜血之刃", "text": "每次攻击命中额外恢复伤害 5% 的生命值" }, "lore": "全解锁验收档专用传说武器。"
+        }
+      ]
+    },
+    "materials": {
+      "fluorescent_wood": 999, "rough_copper": 999, "verdant_core": 999,
+      "ember_sand": 999, "red_iron": 999, "flame_core": 999,
+      "frost_crystal": 999, "mithril": 999, "frost_core": 999,
+      "thunder_stone": 999, "adamantite": 999, "thunder_core": 999,
+      "void_fragment": 999, "abyss_stone": 999, "chaos_core": 999,
+      "venom_gland": 999, "ember_scale": 999, "frost_heart": 999,
+      "storm_feather": 999, "chaos_eye": 999
+    },
+    "currencies": { "gold": 999999, "void": 9999 },
+    "progress": {
+      "unlocked": [0, 1, 2, 3, 4],
+      "completedDepths": [5, 5, 5, 5, 5],
+      "bossKills": [9, 9, 9, 9, 9]
+    },
+    "tutorial": {
+      "interactions": {
+        "forge": true,
+        "equipment-drop": true,
+        "potion-drop": true,
+        "material-drop": true,
+        "altar": true,
+        "resource": true,
+        "portal": true
+      }
+    },
+    "settings": { "sound": true, "music": false, "bgmVolume": 0.72 }
+  },
+  "session": { "scene": "camp" }
+}

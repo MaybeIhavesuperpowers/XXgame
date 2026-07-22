@@ -4,6 +4,12 @@
   "private": true,
   "scripts": {
     "test": "node tests/equipment-system.test.cjs && node tests/project-integrity.test.cjs",
-    "check": "node --check src/game.js && node tests/equipment-system.test.cjs && node tests/project-integrity.test.cjs"
+    "check": "node --check src/game.js && node --check src/forge/ForgeRules.js && node tests/equipment-system.test.cjs && node tests/project-integrity.test.cjs",
+    "test:maa:white": "node tests/maafw/whitebox.cjs",
+    "test:maa:black": "node tests/maafw/blackbox.cjs",
+    "test:maa": "node tests/maafw/run-all.cjs"
+  },
+  "devDependencies": {
+    "@maaxyz/maa-node": "^5.12.2"
   }
 }

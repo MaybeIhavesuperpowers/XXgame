@@ -5,15 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#0b0b14">
   <title>像素纪元：五域远征</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260722-33">
 </head>
 <body>
   <main id="game-shell" aria-label="像素纪元：五域远征游戏区域">
     <canvas id="game" width="1280" height="720" tabindex="0" aria-label="游戏画面"></canvas>
-
     <section id="hud" class="hidden" aria-live="polite">
       <div class="player-card panel-glass">
-        <div class="portrait" aria-hidden="true"></div>
+        <img id="hud-portrait" class="portrait" src="assets/sprites/player-hud-portrait-v1.png?v=1" alt="" aria-hidden="true">
         <div class="status-stack">
           <div class="hud-row"><strong id="hud-level">LV.1</strong><span id="hud-name">失忆的星灵使者</span></div>
           <div class="bar hp"><i id="hp-fill"></i><span id="hp-text">100 / 100</span></div>
@@ -22,13 +21,14 @@
         </div>
       </div>
 
-      <nav class="menu-dock panel-glass" aria-label="游戏功能入口">
-        <button id="inventory-btn" class="dock-inventory"><i class="dock-art"></i><span>背包</span><b id="bag-badge">0 / 120</b></button>
-        <button id="skill-dock-btn" class="dock-skills"><i class="dock-art"></i><span>战技 / 天赋</span><b id="sp-badge">0</b></button>
-        <button id="map-dock-btn" class="dock-map"><i class="dock-art"></i><span>星图</span></button>
-        <button id="forge-dock-btn" class="dock-forge"><i class="dock-art"></i><span>铁匠铺</span><b>B</b></button>
-        <button id="save-list-btn" class="dock-save"><i class="dock-art"></i><span>存档</span><b>L</b></button>
-        <button id="return-dock-btn" class="dock-return hidden"><i class="dock-art"></i><span>返回营地</span><b>T</b></button>
+      <nav class="menu-dock" aria-label="游戏功能入口">
+        <button id="inventory-btn" class="dock-inventory" data-tooltip="背包 · 0 / 120" aria-label="背包"><i class="dock-art"></i><span>背包</span><b id="bag-badge">0 / 120</b></button>
+        <button id="skill-dock-btn" class="dock-skills" data-tooltip="战技 / 天赋" aria-label="战技与天赋"><i class="dock-art"></i><span>战技 / 天赋</span><b id="sp-badge">0</b></button>
+        <button id="map-dock-btn" class="dock-map" data-tooltip="星图" aria-label="星图"><i class="dock-art"></i><span>星图</span></button>
+        <button id="forge-dock-btn" class="dock-forge" data-tooltip="铁匠铺 · B" aria-label="铁匠铺"><i class="dock-art"></i><span>铁匠铺</span><b>B</b></button>
+        <button id="save-list-btn" class="dock-save" data-tooltip="存档列表 · L" aria-label="存档列表"><i class="dock-art"></i><span>存档</span><b>L</b></button>
+        <button id="settings-dock-btn" class="dock-settings" data-tooltip="设置" aria-label="设置"><i class="dock-art" aria-hidden="true">⚙</i><span>设置</span></button>
+        <button id="return-dock-btn" class="dock-return hidden" data-tooltip="返回营地 · T" aria-label="返回营地"><i class="dock-art"></i><span>返回营地</span><b>T</b></button>
       </nav>
 
       <div class="world-card panel-glass">
@@ -47,21 +47,10 @@
         <strong id="quest-text">在营地选择远征大陆</strong>
       </div>
 
-      <div class="quickbar panel-glass">
-        <span><kbd>鼠标 / J</kbd> 三段攻击</span>
-        <span><kbd>R</kbd> 武器战技</span>
-        <span><kbd>F</kbd> 星爆术</span>
-        <span><kbd>空格</kbd> 闪避</span>
-        <span><kbd>Q</kbd> 药水 <b id="potion-text">×3</b></span>
-        <span><kbd>E</kbd> 拾取 / 交互</span>
-        <span><kbd>I</kbd> 背包</span>
-        <span><kbd>Tab</kbd> 区域地图</span>
-        <span><kbd>T</kbd> 回营</span>
-        <span><kbd>L / F5</kbd> <b id="save-state">存档</b></span>
-      </div>
     </section>
 
     <section id="title-screen" class="overlay title-screen">
+      <button id="title-settings-btn" class="title-settings-btn" type="button" aria-label="打开设置" title="设置">⚙</button>
       <div class="title-vignette"></div>
       <div class="title-content">
         <p class="eyebrow">五枚失控核心 · 二十五层远征</p>
@@ -73,7 +62,7 @@
         </div>
         <p id="boot-status" class="boot-status" role="status">正在校验并加载游戏资源…</p>
         <p id="save-meta" class="save-meta">尚无存档</p>
-        <p class="tiny">WASD 行走 · 双击方向奔跑 · 鼠标 360° 瞄准 · R/F 主动战技 · F5 快速保存 · 首次点击后启用原创 BGM</p>
+        <p class="tiny">WASD 行走 · 双击方向奔跑 · J 自动预瞄攻击 · R/F 主动战技 · F5 快速保存</p>
       </div>
       <div class="title-seal" aria-hidden="true">✦</div>
     </section>
@@ -85,7 +74,11 @@
           <button class="close-btn" data-close="continent-panel" aria-label="关闭">×</button>
         </header>
         <p class="modal-lead">每片大陆包含 5 个连续深度。阵亡会返回营地，但资源、装备与成长永久保留。</p>
-        <div id="continent-grid" class="continent-grid"></div>
+        <div id="continent-map" class="continent-map" aria-label="五域大陆地图">
+          <img src="assets/world-map-five-realms-v1.png" alt="五域大陆星图" draggable="false">
+          <div id="continent-hotspots" class="continent-hotspots"></div>
+          <aside id="continent-info" class="continent-info" aria-live="polite"></aside>
+        </div>
       </div>
     </section>
 
@@ -109,16 +102,28 @@
             <button id="skills-btn" class="primary full">战技与天赋星盘</button>
           </div>
           <div class="inventory-column">
-            <div class="section-heading"><h3>装备背包</h3><span id="inventory-count">0 / 120</span></div>
-            <p class="hint">悬停对比身上装备；点击换装。背包共四页，每页 30 格。</p>
-            <div class="inventory-toolbar">
-              <label>批量出售 <select id="bulk-quality"><option value="white">粗糙</option><option value="green">普通</option><option value="blue">稀有</option><option value="purple">史诗</option><option value="gold">传说</option></select></label>
-              <button id="bulk-sell-btn" class="danger">出售该品质</button>
-              <div class="inventory-pager"><button id="inventory-prev" aria-label="上一页">‹</button><b id="inventory-page">1 / 4</b><button id="inventory-next" aria-label="下一页">›</button></div>
+            <div class="inventory-tabs" role="tablist" aria-label="背包分类">
+              <button class="inventory-tab active" data-inventory-tab="equipment" role="tab" aria-selected="true">装备 <b id="inventory-count">0 / 120</b></button>
+              <button class="inventory-tab" data-inventory-tab="materials" role="tab" aria-selected="false">材料 <b id="material-count">0</b></button>
+              <button class="inventory-tab" data-inventory-tab="consumables" role="tab" aria-selected="false">消耗品 <b id="consumable-count">0</b></button>
             </div>
-            <div id="inventory-grid" class="inventory-grid"></div>
-            <h3>远征材料</h3>
-            <div id="materials-list" class="materials-list"></div>
+            <section class="inventory-pane active" data-inventory-pane="equipment" role="tabpanel">
+              <p class="hint">悬停对比身上装备，点击换装。背包每页 30 格。</p>
+              <div class="inventory-toolbar">
+                <label>批量出售 <select id="bulk-quality"><option value="white">粗糙</option><option value="green">普通</option><option value="blue">稀有</option><option value="purple">史诗</option><option value="gold">传说</option></select></label>
+                <button id="bulk-sell-btn" class="danger">出售该品质</button>
+                <div class="inventory-pager"><button id="inventory-prev" aria-label="上一页">‹</button><b id="inventory-page">1 / 4</b><button id="inventory-next" aria-label="下一页">›</button></div>
+              </div>
+              <div id="inventory-grid" class="inventory-grid"></div>
+            </section>
+            <section class="inventory-pane" data-inventory-pane="materials" role="tabpanel">
+              <div class="section-heading"><h3>远征材料</h3><span>用于锻造、强化、重铸与药剂炼制</span></div>
+              <div id="materials-list" class="materials-list"></div>
+            </section>
+            <section class="inventory-pane" data-inventory-pane="consumables" role="tabpanel">
+              <div class="section-heading"><h3>消耗品</h3><span>为卷轴、食物与战斗道具预留</span></div>
+              <div id="consumables-list" class="consumables-list"></div>
+            </section>
           </div>
         </div>
       </div>
@@ -169,7 +174,54 @@
         <button id="resume-btn" class="primary full">继续游戏</button>
         <button id="save-btn" class="full">立即存档</button>
         <button id="pause-save-list-btn" class="full">存档列表</button>
+        <button id="pause-settings-btn" class="full">游戏设置</button>
         <button id="return-camp-btn" class="full danger">放弃本层并返回营地</button>
+      </div>
+    </section>
+
+    <section id="settings-panel" class="overlay modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-box wide settings-box">
+        <header class="modal-header">
+          <div><span class="eyebrow">声音、存档与操作说明</span><h2 id="settings-title">游戏设置</h2></div>
+          <button class="close-btn" data-close="settings-panel" aria-label="关闭">×</button>
+        </header>
+        <div class="settings-grid">
+          <section class="settings-section" aria-labelledby="audio-settings-title">
+            <h3 id="audio-settings-title">声音</h3>
+            <div class="setting-row">
+              <div><strong>背景音乐</strong><small>控制首页、营地与各关卡常驻 BGM</small></div>
+              <button id="settings-music-toggle" class="setting-switch" type="button" role="switch" aria-checked="true">开启</button>
+            </div>
+            <label class="setting-slider" for="bgm-volume"><span>音乐音量 <b id="bgm-volume-text">72%</b></span><input id="bgm-volume" type="range" min="0" max="100" step="1" value="72"></label>
+            <div class="setting-row">
+              <div><strong>战斗音效</strong><small>攻击、受击、掉落与锻造音效</small></div>
+              <button id="settings-sound-toggle" class="setting-switch" type="button" role="switch" aria-checked="true">开启</button>
+            </div>
+          </section>
+          <section class="settings-section" aria-labelledby="save-settings-title">
+            <h3 id="save-settings-title">存档</h3>
+            <div id="settings-save-summary" class="settings-save-summary" aria-live="polite"></div>
+            <button id="settings-save-list-btn" class="full" type="button">查看并管理全部存档</button>
+          </section>
+          <section class="settings-section settings-controls" aria-labelledby="control-settings-title">
+            <h3 id="control-settings-title">操作与战技</h3>
+            <div class="control-list">
+              <p><kbd>WASD</kbd><span>移动；快速双击同方向进入四帧奔跑</span></p>
+              <p><kbd>J</kbd><span>自动锁定无遮挡的高威胁目标并施放三段普通攻击</span></p>
+              <p><kbd>长剑</kbd><span>平砍 → 反向平砍 → 发射可穿透剑气</span></p>
+              <p><kbd>长枪</kbd><span>直刺 → 挑飞并短暂控制 → 人枪一体突进</span></p>
+              <p><kbd>战斧</kbd><span>横劈 → 重劈 → 原地旋转一周造成范围伤害</span></p>
+              <p><kbd>冰杖</kbd><span>星弹 → 强化星弹 → 三向可穿透星弹</span></p>
+              <p><kbd>双匕首</kbd><span>疾刺 → 反手斩 → 带三段独立判定的瞬影连击</span></p>
+              <p><kbd>R</kbd><span>当前武器专属战技：长剑回旋、长枪突阵、战斧震击、星杖散射或双刃瞬杀</span></p>
+              <p><kbd>F</kbd><span>星爆术：攻击周身敌人并发射十二道星屑</span></p>
+              <p><kbd>空格 / Q</kbd><span>闪避 / 使用生命药水</span></p>
+              <p><kbd>I / K</kbd><span>背包 / 战技与天赋</span></p>
+              <p><kbd>Tab / M</kbd><span>区域地图 / 营地大陆星图</span></p>
+              <p><kbd>L / F5</kbd><span>存档列表 / 快速保存</span></p>
+            </div>
+          </section>
+        </div>
       </div>
     </section>
 
@@ -215,11 +267,15 @@
       </div>
       <div class="qa-grid">
         <button id="qa-loadout" data-testid="qa-loadout">装备/背包样本</button>
+        <button id="qa-full-save" data-testid="qa-full-save">生成全解锁测试档</button>
         <button id="qa-mob-fx" data-testid="qa-mob-fx">四种怪物招式</button>
         <button id="qa-boss-fx" data-testid="qa-boss-fx">Boss 下一招</button>
         <button id="qa-drops" data-testid="qa-drops">三类掉落</button>
         <button id="qa-actions" data-testid="qa-actions">走跑攻受击序列</button>
         <button id="qa-weapon" data-testid="qa-weapon">切换武器</button>
+        <button id="qa-combos" data-testid="qa-combos">五武器三段连招</button>
+        <button id="qa-axe-spin" data-testid="qa-axe-spin">战斧三段旋转</button>
+        <button id="qa-direction" data-testid="qa-direction">切换方向</button>
         <button id="qa-hurt" data-testid="qa-hurt">角色受击</button>
         <button id="qa-clear" data-testid="qa-clear">清场 / 星门</button>
       </div>
@@ -229,11 +285,12 @@
     <span aria-hidden="true">↻</span><strong>请将设备横向旋转</strong><small>横屏可获得完整战斗视野和更大的触控按钮</small>
   </div>
   <script src="src/equipment/SpriteSheet.js?v=1" defer></script>
-  <script src="src/equipment/Equipment.js?v=2" defer></script>
+  <script src="src/equipment/Equipment.js?v=3" defer></script>
   <script src="src/equipment/Character.js?v=1" defer></script>
-  <script src="src/equipment/LayeredCharacterRenderer.js?v=2" defer></script>
-  <script src="data/equipment/embedded-config.js?v=1" defer></script>
+  <script src="src/equipment/LayeredCharacterRenderer.js?v=5" defer></script>
+  <script src="data/equipment/embedded-config.js?v=7" defer></script>
   <script src="src/equipment/EquipmentSystem.js?v=3" defer></script>
-  <script src="src/game.js?v=20260722-24" defer></script>
+  <script src="src/forge/ForgeRules.js?v=1" defer></script>
+  <script src="src/game.js?v=20260722-43" defer></script>
 </body>
 </html>

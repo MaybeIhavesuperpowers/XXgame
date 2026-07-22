@@ -6,6 +6,18 @@
   const DEFAULT_LAYER_ORDER = Object.freeze({
     shadow: -100, body: 0, hair: 10, armor: 20, shield: 25, helmet: 30, weapon: 40, effect: 50
   });
+  const REGION_WEARABLE_FILTERS = Object.freeze([
+    "none",
+    "grayscale(.5) saturate(1.8) brightness(.78) contrast(1.28)",
+    "grayscale(.78) sepia(.12) hue-rotate(155deg) saturate(1.35) brightness(1.28) contrast(1.05)",
+    "hue-rotate(105deg) saturate(1.5) brightness(1.08) contrast(1.08)",
+    "grayscale(.72) hue-rotate(225deg) saturate(.72) brightness(.58) contrast(1.3)"
+  ]);
+
+  const wearableFilterFor = definitionId => {
+    const match = /^(?:armor|boots)_(\d)$/.exec(definitionId || "");
+    return match ? REGION_WEARABLE_FILTERS[Number(match[1])] || "none" : null;
+  };
 
   const rotatePoint = (x, y, angle) => ({
     x: x * Math.cos(angle) - y * Math.sin(angle),
@@ -89,9 +101,12 @@
           size: frame?.size || part.size || [32, 32], origin: frame?.origin || part.origin || defaultOrigin,
           rotation: Number(part.rotation ?? equipment.definition.rotation ?? 0) * DEG_TO_RAD,
           rotationMode: part.rotationMode || equipment.definition.rotationMode || "anchor",
-          flipX: Boolean(part.flipXByDirection?.[character.direction]),
+          flipX: Boolean(frame?.flipX ?? part.flipX ?? part.flipXByDirection?.[character.direction]),
           alpha: frame?.alpha ?? part.alpha ?? 1, effect: frame?.effect || part.effect || null,
-          filter: frame?.filter || part.filter || equipment.definition.filter || null
+          // Inventory icons and worn models share the same five-region palette.
+          // Centralizing it here prevents stale JSON filters from making an
+          // equipped item look different from its own thumbnail.
+          filter: frame?.filter || part.filter || wearableFilterFor(equipment.definitionId) || equipment.definition.filter || null
         });
       });
     }
@@ -107,10 +122,11 @@
 
     drawCommand(ctx, character, command) {
       if (command.kind === "shadow") return this.drawShadow(ctx, character);
-      const anchor = character.getWorldAnchor(command.anchor);
+      const anchor = this.getWorldAnchor(character, command.anchor);
+      const worldRotation = Number(character.pose.worldRotation || 0);
       let rotation = anchor.rotation + command.rotation;
-      if (command.rotationMode === "aim") rotation = Number(character.pose.aimAngle || 0) + command.rotation;
-      if (command.rotationMode === "weapon") rotation = Number(character.pose.weaponAngle ?? character.pose.aimAngle ?? 0) + command.rotation;
+      if (command.rotationMode === "aim") rotation = Number(character.pose.aimAngle || 0) + command.rotation + worldRotation;
+      if (command.rotationMode === "weapon") rotation = Number(character.pose.weaponAngle ?? character.pose.aimAngle ?? 0) + command.rotation + worldRotation;
       const rawOffset = { x: Number(command.offset.x || 0), y: Number(command.offset.y || 0) };
       const offset = command.offsetSpace === "world" ? rawOffset : rotatePoint(rawOffset.x, rawOffset.y, rotation - command.rotation);
       const x = Math.round(anchor.x + offset.x);
@@ -150,7 +166,18 @@
     }
 
     getWorldAnchor(character, name) {
-      return character.getWorldAnchor(name);
+      const anchor = character.getWorldAnchor(name);
+      const rotation = Number(character.pose.worldRotation || 0);
+      if (!rotation) return anchor;
+      const pivotX = Math.round(character.x + Number(character.pose.rotationPivotX || 0));
+      const pivotY = Math.round(character.y + Number(character.pose.rotationPivotY || 0));
+      const rotated = rotatePoint(anchor.x - pivotX, anchor.y - pivotY, rotation);
+      return {
+        ...anchor,
+        x: Math.round(pivotX + rotated.x),
+        y: Math.round(pivotY + rotated.y),
+        rotation: Number(anchor.rotation || 0) + rotation
+      };
     }
   }
 

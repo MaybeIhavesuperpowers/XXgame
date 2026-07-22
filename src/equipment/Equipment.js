@@ -43,7 +43,9 @@
       return parts.map(part => {
         const partDirection = part.directions?.[direction] || {};
         const partAnimation = part.animations?.[animation] || {};
-        const resolved = mergePart(mergePart(mergePart(part, directionOverride), animationOverride), mergePart(partDirection, partAnimation));
+        const carriedOnBack = definition.carryOnBack && animation !== "attack";
+        const carryOverride = carriedOnBack ? definition.backPose || {} : {};
+        const resolved = mergePart(mergePart(mergePart(mergePart(part, directionOverride), animationOverride), mergePart(partDirection, partAnimation)), carryOverride);
         const animationSetId = resolved.animationSet || definition.animationSet;
         return {
           ...resolved,
